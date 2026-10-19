@@ -325,6 +325,26 @@ describe('ExportSession attribution', () => {
     expect(altered).toBe(0)
   })
 
+  it('flat: composites attribution at square 16k past sharp default input pixel limit', async () => {
+    const size = 16384
+    const outPath = join(dir, 'map.png')
+    const spec: ExportJobSpec = { ...flatSpec(outPath, ATTRIBUTION), chunkPx: size, actualWidth: size, actualHeight: size, outWidth: size, outHeight: size, cols: 1, rows: 1 }
+    const session = new ExportSession(spec, () => {})
+    const chunk = await sharp({
+      create: { width: size, height: size, channels: 4, background: { r: 20, g: 40, b: 60, alpha: 1 } },
+      limitInputPixels: false,
+    })
+      .png()
+      .toBuffer()
+
+    await session.addChunk('Flat', { col: 0, row: 0, png: chunk })
+    await session.finish()
+
+    const meta = await sharp(await readFile(outPath), { limitInputPixels: false }).metadata()
+    expect(meta.width).toBe(size)
+    expect(meta.height).toBe(size)
+  }, 240_000)
+
   it('layered psd: attribution is appended as the topmost layer', async () => {
     const outPath = join(dir, 'map.psd')
     const spec: ExportJobSpec = { ...layeredSpec('psd', outPath), attribution: ATTRIBUTION }

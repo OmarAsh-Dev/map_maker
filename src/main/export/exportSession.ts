@@ -124,7 +124,7 @@ export class ExportSession {
           this.spec.attribution
         )
         png = await sharp(this.composited.get(FLAT_GROUP)!, { limitInputPixels: false })
-          .composite([{ input: overlay, left: 0, top: 0 }])
+          .composite([{ input: overlay, left: 0, top: 0, limitInputPixels: false }])
           .png()
           .toBuffer()
       }
