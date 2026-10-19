@@ -32,4 +32,6 @@ npm on this machine runs an `allow-scripts` policy (non-strict): install scripts
 
 ## Conventions
 
-- None established yet. Don't invent folder structures silently — propose a scaffold and let the user confirm.
+- Scaffold: `src/main`, `src/preload`, `src/renderer` (electron-vite), tests colocated as `*.test.ts(x)`, built output in `out/`, packaged artifacts in `release/`.
+- Tests use vitest with jsdom enabled per-file via a `// @vitest-environment jsdom` header comment.
+- Don't add new top-level folders or dependencies without confirming.
