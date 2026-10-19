@@ -7,6 +7,8 @@ import type { LayerMap } from './styleMap'
 
 const FLAT_GROUP = 'Flat'
 
+export const ATTRIBUTION_TEXT = '© OpenStreetMap contributors'
+
 export interface ExportChunkImage {
   col: number
   row: number
@@ -54,6 +56,7 @@ export interface RunExportOptions {
   style: StyleSpecification
   layerMap: LayerMap
   outPath: string
+  attribution: boolean
   renderer?: ExportRenderer
   onProgress: (done: number, total: number) => void
   signal: AbortSignal
@@ -78,6 +81,7 @@ export async function runExport(opts: RunExportOptions): Promise<void> {
     outHeight: plan.actualHeight,
     groups: opts.mode === 'flat' ? [] : exportGroups(opts.layerMap, opts.style),
     outPath: opts.outPath,
+    attribution: opts.attribution ? ATTRIBUTION_TEXT : null,
   })
 
   let renderer = opts.renderer
@@ -104,6 +108,11 @@ export async function runExport(opts: RunExportOptions): Promise<void> {
       }
     }
     await window.api.finishExport()
+  } catch (err) {
+    if (!opts.signal.aborted) {
+      window.api.cancelExport()
+    }
+    throw err
   } finally {
     if (renderer) {
       renderer.destroy()

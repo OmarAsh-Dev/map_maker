@@ -85,6 +85,7 @@ async function run(log: Log): Promise<void> {
         style,
         layerMap,
         outPath: `${OUT_DIR}/selftest-flat.png`,
+        attribution: true,
         onProgress: (done, total) => log(`flat render: ${done}/${total} chunks`),
         signal: new AbortController().signal,
       })
@@ -102,6 +103,7 @@ async function run(log: Log): Promise<void> {
         style,
         layerMap,
         outPath: `${OUT_DIR}/selftest-layered.psd`,
+        attribution: true,
         onProgress: (done, total) => log(`layered render: ${done}/${total} chunk renders`),
         signal: new AbortController().signal,
       })

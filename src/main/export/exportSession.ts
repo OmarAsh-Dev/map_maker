@@ -1,5 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import sharp from 'sharp'
+import { renderAttributionPng } from './attribution'
 import { compositeChunks, type CompositorChunk } from './compositor'
 import { assemblePsd } from './psd'
 
@@ -15,6 +17,7 @@ export interface ExportJobSpec {
   outHeight: number
   groups: { id: string; label: string }[]
   outPath: string
+  attribution: string | null
 }
 
 export type ExportProgress =
@@ -113,7 +116,19 @@ export class ExportSession {
       }
       this.onProgress({ stage: 'assembling' })
       await mkdir(dirname(this.spec.outPath), { recursive: true })
-      await writeFile(this.spec.outPath, this.composited.get(FLAT_GROUP)!)
+      let png = this.composited.get(FLAT_GROUP)!
+      if (this.spec.attribution !== null) {
+        const overlay = await renderAttributionPng(
+          this.spec.outWidth,
+          this.spec.outHeight,
+          this.spec.attribution
+        )
+        png = await sharp(this.composited.get(FLAT_GROUP)!)
+          .composite([{ input: overlay, left: 0, top: 0 }])
+          .png()
+          .toBuffer()
+      }
+      await writeFile(this.spec.outPath, png)
       this.finished = true
       this.onProgress({ stage: 'done', path: this.spec.outPath })
       return
@@ -133,6 +148,16 @@ export class ExportSession {
         name: group.label,
         png: this.composited.get(group.label)!,
       }))
+      if (this.spec.attribution !== null) {
+        layers.push({
+          name: 'Attribution',
+          png: await renderAttributionPng(
+            this.spec.outWidth,
+            this.spec.outHeight,
+            this.spec.attribution
+          ),
+        })
+      }
       const buffer = await assemblePsd(layers, this.spec.outWidth, this.spec.outHeight)
       await mkdir(dirname(this.spec.outPath), { recursive: true })
       await writeFile(this.spec.outPath, buffer)
@@ -146,6 +171,16 @@ export class ExportSession {
       await writeFile(
         join(this.spec.outPath, `${slugify(group.label)}.png`),
         this.composited.get(group.label)!
+      )
+    }
+    if (this.spec.attribution !== null) {
+      await writeFile(
+        join(this.spec.outPath, 'Attribution.png'),
+        await renderAttributionPng(
+          this.spec.outWidth,
+          this.spec.outHeight,
+          this.spec.attribution
+        )
       )
     }
     this.finished = true

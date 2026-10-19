@@ -41,6 +41,7 @@ const SPEC: ExportJobSpec = {
   outHeight: 2048,
   groups: [],
   outPath: 'C:/out/map.png',
+  attribution: null,
 }
 
 beforeEach(() => {

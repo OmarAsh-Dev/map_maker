@@ -67,6 +67,7 @@ function baseOpts(overrides?: Partial<Parameters<typeof runExport>[0]>) {
     style: STYLE,
     layerMap: LAYER_MAP,
     outPath: 'C:/out/map.png',
+    attribution: true,
     onProgress: vi.fn(),
     signal: new AbortController().signal,
     ...overrides,
@@ -189,6 +190,7 @@ describe('runExport', () => {
     expect(calls).toHaveLength(2)
     expect(fakeApi.sendChunk).toHaveBeenCalledTimes(2)
     expect(fakeApi.finishExport).not.toHaveBeenCalled()
+    expect(fakeApi.cancelExport).not.toHaveBeenCalled()
     expect(renderer.destroy).toHaveBeenCalledTimes(1)
   })
 
@@ -202,7 +204,42 @@ describe('runExport', () => {
     ).rejects.toThrow(/cancel/i)
 
     expect(fakeApi.beginExport).not.toHaveBeenCalled()
+    expect(fakeApi.cancelExport).not.toHaveBeenCalled()
     expect(renderer.renderChunk).not.toHaveBeenCalled()
     expect(fakeApi.finishExport).not.toHaveBeenCalled()
+  })
+
+  it('cancels the dangling main-side session when rendering fails mid-export', async () => {
+    const { renderer, renderChunk } = createFakeRenderer()
+    ;(renderChunk as Mock).mockRejectedValue(new Error('render exploded'))
+
+    await expect(runExport(baseOpts({ renderer }))).rejects.toThrow(/render exploded/)
+
+    expect(fakeApi.beginExport).toHaveBeenCalledTimes(1)
+    expect(fakeApi.cancelExport).toHaveBeenCalledTimes(1)
+    expect(fakeApi.finishExport).not.toHaveBeenCalled()
+    expect(renderer.destroy).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancels the main-side session when finishExport rejects without a main error event', async () => {
+    const { renderer } = createFakeRenderer()
+    fakeApi.finishExport.mockRejectedValueOnce(new Error('unexpected main failure'))
+
+    await expect(runExport(baseOpts({ renderer }))).rejects.toThrow(/unexpected main failure/)
+
+    expect(fakeApi.cancelExport).toHaveBeenCalledTimes(1)
+    expect(renderer.destroy).toHaveBeenCalledTimes(1)
+  })
+
+  it('maps the attribution flag to the standard string or null in the export spec', async () => {
+    const { renderer } = createFakeRenderer()
+
+    await runExport(baseOpts({ renderer, attribution: true }))
+    expect(fakeApi.beginExport.mock.calls[0][0]).toMatchObject({
+      attribution: '© OpenStreetMap contributors',
+    })
+
+    await runExport(baseOpts({ renderer, attribution: false }))
+    expect(fakeApi.beginExport.mock.calls[1][0]).toMatchObject({ attribution: null })
   })
 })

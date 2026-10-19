@@ -155,6 +155,7 @@ describe('ExportDialog', () => {
       cols: plan.cols,
       rows: plan.rows,
       outPath: 'C:/out/map.png',
+      attribution: '© OpenStreetMap contributors',
     })
     expect(api.sendChunk).toHaveBeenCalledTimes(plan.chunks.length)
     expect(useExportStore.getState().status).toBe('done')

@@ -125,6 +125,7 @@ export default function ExportDialog() {
         style,
         layerMap,
         outPath,
+        attribution: state.attribution,
         onProgress: (done, total) => useExportStore.getState().setRenderProgress(done, total),
         signal: controller.signal,
       })

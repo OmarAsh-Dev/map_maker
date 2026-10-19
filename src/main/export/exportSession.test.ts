@@ -50,6 +50,7 @@ describe('ExportSession flat mode', () => {
       outHeight: 128,
       groups: [],
       outPath,
+      attribution: null,
     }
     const session = new ExportSession(spec, () => {})
 
@@ -90,6 +91,7 @@ describe('ExportSession flat mode', () => {
       outHeight: 128,
       groups: [],
       outPath,
+      attribution: null,
     }
     const events: ExportProgress[] = []
     const session = new ExportSession(spec, collector(events))
@@ -106,31 +108,32 @@ describe('ExportSession flat mode', () => {
   })
 })
 
+function layeredSpec(container: 'psd' | 'png-folder', outPath: string): ExportJobSpec {
+  return {
+    mode: 'layered',
+    container,
+    cols: 1,
+    rows: 1,
+    chunkPx: 32,
+    actualWidth: 32,
+    actualHeight: 32,
+    outWidth: 32,
+    outHeight: 32,
+    groups: [
+      { id: 'roads', label: 'Roads' },
+      { id: 'roads-labels', label: 'Roads labels' },
+    ],
+    outPath,
+    attribution: null,
+  }
+}
+
+async function feedLayered(session: ExportSession): Promise<void> {
+  await session.addChunk('Roads', { col: 0, row: 0, png: await solidPng(0, 0, 255, 32) })
+  await session.addChunk('Roads labels', { col: 0, row: 0, png: await solidPng(255, 0, 0, 32) })
+}
+
 describe('ExportSession layered mode', () => {
-  function layeredSpec(container: 'psd' | 'png-folder', outPath: string): ExportJobSpec {
-    return {
-      mode: 'layered',
-      container,
-      cols: 1,
-      rows: 1,
-      chunkPx: 32,
-      actualWidth: 32,
-      actualHeight: 32,
-      outWidth: 32,
-      outHeight: 32,
-      groups: [
-        { id: 'roads', label: 'Roads' },
-        { id: 'roads-labels', label: 'Roads labels' },
-      ],
-      outPath,
-    }
-  }
-
-  async function feedLayered(session: ExportSession): Promise<void> {
-    await session.addChunk('Roads', { col: 0, row: 0, png: await solidPng(0, 0, 255, 32) })
-    await session.addChunk('Roads labels', { col: 0, row: 0, png: await solidPng(255, 0, 0, 32) })
-  }
-
   it('assembles a psd with children ordered top-first over bottom→top group order', async () => {
     const outPath = join(dir, 'map.psd')
     const session = new ExportSession(layeredSpec('psd', outPath), () => {})
@@ -238,5 +241,158 @@ describe('ExportSession layered mode', () => {
     await expect(session.finish()).rejects.toThrow(/cancelled/i)
     expect(events).toHaveLength(emittedBeforeCancel)
     await expect(stat(outPath)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+})
+
+describe('ExportSession attribution', () => {
+  const ATTRIBUTION = '© OpenStreetMap contributors'
+
+  function flatSpec(outPath: string, attribution: string | null): ExportJobSpec {
+    return {
+      mode: 'flat',
+      container: 'png-folder',
+      cols: 2,
+      rows: 2,
+      chunkPx: 64,
+      actualWidth: 128,
+      actualHeight: 128,
+      outWidth: 128,
+      outHeight: 128,
+      groups: [],
+      outPath,
+      attribution,
+    }
+  }
+
+  async function feedFlat(session: ExportSession): Promise<void> {
+    for (const [col, row] of [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [1, 1],
+    ]) {
+      await session.addChunk('Flat', { col, row, png: await solidPng(20, 40, 60) })
+    }
+  }
+
+  it('flat: composites attribution into the bottom-right, leaving the rest untouched', async () => {
+    const outPath = join(dir, 'map.png')
+    const session = new ExportSession(flatSpec(outPath, ATTRIBUTION), () => {})
+
+    await feedFlat(session)
+    await session.finish()
+
+    const { data, info } = await sharp(await readFile(outPath))
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+    expect(info.width).toBe(128)
+    expect(info.height).toBe(128)
+
+    const pixelAt = (x: number, y: number): [number, number, number, number] => {
+      const i = (y * info.width + x) * 4
+      return [data[i], data[i + 1], data[i + 2], data[i + 3]]
+    }
+
+    expect(pixelAt(10, 10)).toEqual([20, 40, 60, 255])
+
+    let altered = 0
+    for (let y = 96; y < 126; y++) {
+      for (let x = 20; x < 124; x++) {
+        const [r, g, b] = pixelAt(x, y)
+        if (r !== 20 || g !== 40 || b !== 60) altered++
+      }
+    }
+    expect(altered).toBeGreaterThan(30)
+  })
+
+  it('flat: attribution null leaves the image uniform', async () => {
+    const outPath = join(dir, 'map.png')
+    const session = new ExportSession(flatSpec(outPath, null), () => {})
+
+    await feedFlat(session)
+    await session.finish()
+
+    const { data, info } = await sharp(await readFile(outPath))
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+    let altered = 0
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] !== 20 || data[i + 1] !== 40 || data[i + 2] !== 60) altered++
+    }
+    expect(info.width).toBe(128)
+    expect(altered).toBe(0)
+  })
+
+  it('layered psd: attribution is appended as the topmost layer', async () => {
+    const outPath = join(dir, 'map.psd')
+    const spec: ExportJobSpec = { ...layeredSpec('psd', outPath), attribution: ATTRIBUTION }
+    const session = new ExportSession(spec, () => {})
+
+    await feedLayered(session)
+    await session.finish()
+
+    const psd = readPsd(await readFile(outPath), { useImageData: true })
+    expect(psd.children).toHaveLength(3)
+    expect(psd.children![0].name).toBe('Attribution')
+    expect(psd.children![1].name).toBe('Roads labels')
+    expect(psd.children![2].name).toBe('Roads')
+
+    const attrData = psd.children![0].imageData!.data as Uint8Array
+    let lit = 0
+    for (let i = 3; i < attrData.length; i += 4) {
+      if (attrData[i] > 0) lit++
+    }
+    expect(lit).toBeGreaterThan(0)
+  })
+
+  it('layered psd: attribution null adds no layer', async () => {
+    const outPath = join(dir, 'map.psd')
+    const session = new ExportSession(layeredSpec('psd', outPath), () => {})
+
+    await feedLayered(session)
+    await session.finish()
+
+    const psd = readPsd(await readFile(outPath), { useImageData: true })
+    expect(psd.children).toHaveLength(2)
+    expect(psd.children!.map((child) => child.name)).not.toContain('Attribution')
+  })
+
+  it('png-folder: writes an extra Attribution.png when attribution is set', async () => {
+    const outPath = join(dir, 'layers')
+    await mkdir(outPath)
+    const spec: ExportJobSpec = { ...layeredSpec('png-folder', outPath), attribution: ATTRIBUTION }
+    const session = new ExportSession(spec, () => {})
+
+    await feedLayered(session)
+    await session.finish()
+
+    const attrFile = await stat(join(outPath, 'Attribution.png'))
+    expect(attrFile.isFile()).toBe(true)
+    const meta = await sharp(await readFile(join(outPath, 'Attribution.png'))).metadata()
+    expect(meta.width).toBe(32)
+    expect(meta.height).toBe(32)
+
+    const { data } = await sharp(await readFile(join(outPath, 'Attribution.png')))
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+    let lit = 0
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] > 0) lit++
+    }
+    expect(lit).toBeGreaterThan(0)
+  })
+
+  it('png-folder: attribution null writes no Attribution.png', async () => {
+    const outPath = join(dir, 'layers')
+    await mkdir(outPath)
+    const session = new ExportSession(layeredSpec('png-folder', outPath), () => {})
+
+    await feedLayered(session)
+    await session.finish()
+
+    await expect(stat(join(outPath, 'Attribution.png'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 })
