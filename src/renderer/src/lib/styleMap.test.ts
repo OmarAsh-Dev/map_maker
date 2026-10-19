@@ -28,6 +28,40 @@ function layoutOf(style: StyleSpecification, id: string): Record<string, unknown
   return layer?.layout ?? {}
 }
 
+describe('background layer type mapping', () => {
+  const bgStyle = {
+    version: 8,
+    sources: {},
+    layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#f8f4f0' } }],
+  } as unknown as StyleSpecification
+  const bgMap: LayerMap = { background: { fill: ['background'], casing: [], labels: [] } }
+
+  it('writes geometry fill as background-color on background layers', () => {
+    const style = applyCategoryPatch(bgStyle, bgMap, 'background', { geometryFill: '#123456' })
+    expect(paintOf(style, 'background')['background-color']).toBe('#123456')
+    expect(paintOf(style, 'background')['fill-color']).toBeUndefined()
+  })
+
+  it('writes geometry opacity as background-opacity on background layers', () => {
+    const style = applyCategoryPatch(bgStyle, bgMap, 'background', { geometryOpacity: 0.5 })
+    expect(paintOf(style, 'background')['background-opacity']).toBe(0.5)
+    expect(paintOf(style, 'background')['fill-opacity']).toBeUndefined()
+  })
+
+  it('reads fill back from background-color', () => {
+    const patched = applyCategoryPatch(bgStyle, bgMap, 'background', { geometryFill: '#123456' })
+    expect(readCategory(patched, bgMap, 'background').geometryFill).toBe('#123456')
+  })
+
+  it('reads the initial background color instead of reporting mixed', () => {
+    expect(readCategory(bgStyle, bgMap, 'background').geometryFill).toBe('#f8f4f0')
+  })
+
+  it('pins current read behavior: absent background-opacity reports mixed (T3 deferred default)', () => {
+    expect(readCategory(bgStyle, bgMap, 'background').geometryOpacity).toBe('mixed')
+  })
+})
+
 describe('applyCategoryPatch', () => {
   it('writes geometry fill to the fill slot layer without mutating the input style', () => {
     const snapshot = JSON.parse(JSON.stringify(baseStyle))

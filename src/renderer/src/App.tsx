@@ -70,7 +70,7 @@ function App() {
         <h1 className="pointer-events-none absolute left-4 top-4 z-10 text-4xl font-bold text-slate-50">
           map_maker
         </h1>
-        <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
+        <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
           <button
             type="button"
             onClick={() => {

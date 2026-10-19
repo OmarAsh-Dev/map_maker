@@ -6,6 +6,7 @@ import '@testing-library/jest-dom/vitest'
 import type { StyleSpecification } from 'maplibre-gl'
 import App from './App'
 import { useMapStore } from './stores/mapStore'
+import { useExportStore } from './stores/exportStore'
 
 const { mapInstances } = vi.hoisted(() => ({
   mapInstances: [] as Array<{ setStyle: Mock; remove: Mock }>,
@@ -54,6 +55,37 @@ afterEach(() => {
 it('renders the map_maker title', () => {
   render(<App />)
   expect(screen.getByText('map_maker')).toBeInTheDocument()
+})
+
+describe('crop mode toggle', () => {
+  afterEach(() => {
+    useExportStore.setState({ cropMode: false, cropBounds: null, dialogOpen: false })
+  })
+
+  it('toggles crop mode off via the Done selecting button', () => {
+    render(<App />)
+    act(() => {
+      useExportStore.getState().setCropMode(true)
+    })
+    expect(screen.getByText('Done selecting')).toBeInTheDocument()
+
+    act(() => {
+      screen.getByText('Done selecting').dispatchEvent(
+        new MouseEvent('click', { bubbles: true })
+      )
+    })
+    expect(useExportStore.getState().cropMode).toBe(false)
+  })
+
+  it('keeps the crop toolbar above the crop overlay so Done selecting stays clickable in a real browser', () => {
+    // jsdom performs no hit-testing, so this pins the stacking contract the
+    // overlay (z-20, inset-0) must not cover the toolbar: the toolbar must sit
+    // strictly above z-20 or clicks land on the overlay and start a drag.
+    render(<App />)
+    const button = screen.getByText('Select area')
+    const toolbar = button.closest('div')
+    expect(toolbar?.className).toMatch(/\bz-30\b/)
+  })
 })
 
 describe('store to map style sync', () => {
