@@ -9,11 +9,20 @@ Desktop clone of [mapbuilder.app/map](https://mapbuilder.app/map) — a map cust
 
 Users style/recolor map features, add overlays (markers, lines, shapes, text), drag-select a region, and export a high-resolution image. Final deliverable is a **Windows .exe**.
 
-## Stack (decided, not yet scaffolded)
+## Stack
 
-- React + TypeScript + Tailwind CSS, running in Electron
-- Packaging target: Windows executable
-- **The repo is currently empty** — no `package.json`, no build commands, no scaffold exists yet. First task is scaffolding the Electron app. Update this file with real commands (`dev`, `build`, `test`) once `package.json` exists.
+- React + TypeScript + Tailwind CSS v4, running in Electron (electron-vite scaffold)
+- Packaging target: Windows executable (electron-builder, zip target)
+
+## Commands
+
+- `npm run dev` — Electron dev with HMR (vite dev server + Electron)
+- `npm run build` — electron-vite build, emits `out/`
+- `npm test` — vitest run (jsdom via per-file `// @vitest-environment jsdom` header)
+- `npm run typecheck` — `tsc --noEmit` on `tsconfig.web.json` + `tsconfig.node.json`
+- `npm run dist` — electron-vite build + electron-builder --win → zip in `release/`
+
+npm on this machine runs an `allow-scripts` policy (non-strict): install scripts not on the allowlist are skipped with a warning. Electron's binary is installed by running `node node_modules/electron/install.js` manually if `node_modules/electron/dist` is missing after a fresh install.
 
 ## Tile source: OpenFreeMap
 

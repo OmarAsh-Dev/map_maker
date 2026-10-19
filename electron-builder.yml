@@ -1,0 +1,13 @@
+appId: com.mapmaker.app
+productName: map-maker
+directories:
+  output: release
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - '**/node_modules/sharp/**'
+  - '**/node_modules/canvas/**'
+win:
+  target:
+    - zip
