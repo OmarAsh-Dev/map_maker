@@ -25,11 +25,14 @@ Reference product: <https://mapbuilder.app/map> — the UI should feel immediate
    - Mode: **Flat** (one image) or **Layered** (one full-size transparent image per layer group).
    - Flat format: PNG.
    - Layered container: **PSD** (opens in AE as layers; default) or folder of transparent PNGs (fallback toggle).
+   - Layer structure: each top-level category exports as **two layers — geometry and labels** (e.g. "Roads" and "Roads labels"). Labels are placed once with global collision so the result matches the screen exactly, then assigned to their parent category's label layer. Hiding a category hides its geometry and its labels together.
    - Size: presets 1080p / 4K / 8K / 16K plus custom; cap long edge at 16,384 px; optional aspect-ratio locks (16:9, 9:16, 1:1, free).
    - Output must match what the on-screen map shows at that zoom.
 4. **Rendering** stitches map tiles offscreen in chunks so 16k output works regardless of GPU max texture size, with a progress bar and cancel.
 5. **Presets**: save and load the current style locally as JSON.
-6. **Attribution**: included by default; removable after an explicit warning (OSM ODbL requires attribution).
+6. **Attribution**: included by default; removable after an explicit warning dialog stating that OSM's license (ODbL) and OpenFreeMap's terms require attribution in published media including video, and that removing it is the user's responsibility.
+
+The map view is **strictly top-down in v1**: pitch is locked at 0 (bearing rotation is allowed — it stitches seam-free). This keeps 16k stitched exports geometrically exact.
 
 ## Non-goals (v1)
 
@@ -48,7 +51,7 @@ Reference product: <https://mapbuilder.app/map> — the UI should feel immediate
 
 - **Tiles**: OpenFreeMap only. No API key, no registration — never add one or ask the user for one. Vector tiles rendered with **MapLibre GL JS**; styles are URLs like `https://tiles.openfreemap.org/styles/liberty`. Feature editing happens through the MapLibre style spec (layers / paint properties), not raster recoloring.
 - **Stack** (decided): React + TypeScript + Tailwind CSS in Electron; Windows 10/11 x64.
-- **Deliverable**: `electron-builder` with the **zip** target (NSIS disabled) — a zip containing the standalone exe.
+- **Deliverable**: `electron-builder` with the **zip** target (NSIS disabled) — a zip containing the standalone exe. The exe ships **unsigned**; users see a one-time SmartScreen prompt (product owner accepted this). The exe ships **unsigned**; users see a one-time SmartScreen prompt (product owner accepted this).
 - **License**: OSM data is ODbL; attribution must be offered (see Goals #6).
 
 ## Decisions the product owner made
@@ -76,4 +79,20 @@ Reference product: <https://mapbuilder.app/map> — the UI should feel immediate
 - Tile-stitch rendering: chunk math, seam consistency (labels and road casing across chunk boundaries), memory strategy (a 16k RGBA canvas is ~1 GiB per layer; layered PSD assembly must be chunked).
 - Electron process architecture (main/renderer split, IPC for file dialogs and export pipeline), folder structure, state management, and test framework.
 - PSD layer ordering and naming so the AE import is immediately usable.
+## Left to the builder
+
+- The mapping table from OpenFreeMap style layers (per style) to the category tree and sub-items, including which style-spec properties back Fill / Stroke / Opacity / Label sections.
+- Tile-stitch rendering: chunk math, seam consistency (labels and road casing across chunk boundaries), memory strategy (a 16k RGBA canvas is ~1 GiB per layer; layered PSD assembly must be chunked).
+- Electron process architecture (main/renderer split, IPC for file dialogs and export pipeline), folder structure, state management, and test framework.
+- PSD layer ordering and naming so the AE import is immediately usable; fall back to PSB (AE-compatible) if a 16k multi-layer file exceeds classic PSD limits.
+- Tile fetching etiquette: conservative request caps (~4 parallel), disk cache, and a User-Agent identifying the app, per OpenFreeMap ToS.
 - Exact attribution string and placement.
+
+## Builder-check resolutions (2026-10-19)
+
+Reviewed by a fresh builder subagent; product owner resolved the open items:
+
+- **Layered labels**: labels live with their group — each category exports as geometry + labels sub-layers (product owner confirmed).
+- **Camera**: exports are strictly top-down; pitch locked at 0 in v1 (product owner confirmed).
+- **Attribution removal**: warning + accept; user assumes ODbL obligation (product owner confirmed).
+- **Code signing**: ship unsigned; one-time SmartScreen prompt accepted (product owner confirmed).
