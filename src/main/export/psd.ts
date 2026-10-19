@@ -20,7 +20,10 @@ function ensureCanvasInitialized(): void {
 }
 
 async function pngToCanvas(png: Buffer, width: number, height: number): Promise<PsdCanvas> {
-  const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  const { data, info } = await sharp(png, { limitInputPixels: false })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
   const canvas = createCanvas(width, height) as unknown as PsdCanvas
   const ctx = canvas.getContext('2d')!
   const imageData = ctx.createImageData(width, height)
@@ -36,10 +39,19 @@ async function pngToCanvas(png: Buffer, width: number, height: number): Promise<
 async function flattenLayers(layers: PsdLayer[], width: number, height: number): Promise<PsdCanvas> {
   const base = sharp({
     create: { width, height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    limitInputPixels: false,
   })
   const flat = await (
     layers.length > 0
-      ? base.composite(layers.map((layer) => ({ input: layer.png, left: 0, top: 0, blend: 'over' as const })))
+      ? base.composite(
+          layers.map((layer) => ({
+            input: layer.png,
+            left: 0,
+            top: 0,
+            blend: 'over' as const,
+            limitInputPixels: false,
+          }))
+        )
       : base
   )
     .ensureAlpha()

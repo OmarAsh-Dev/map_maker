@@ -63,4 +63,21 @@ describe('assemblePsd', () => {
     expect(psd.height).toBe(32)
     expect(psd.children![0].name).toBe('Huge')
   })
+
+  it('assembles a square 16k layer past sharp default input pixel limit', async () => {
+    const size = 16384
+    const png = await sharp({
+      create: { width: size, height: size, channels: 4, background: { r: 10, g: 20, b: 30, alpha: 1 } },
+      limitInputPixels: false,
+    })
+      .png()
+      .toBuffer()
+
+    const buffer = await assemblePsd([{ name: 'Square16k', png }], size, size)
+
+    expect(buffer.readUInt16BE(4)).toBe(1)
+    expect(buffer.subarray(0, 4).toString('ascii')).toBe('8BPS')
+    expect(buffer.readUInt32BE(18)).toBe(size)
+    expect(buffer.readUInt32BE(14)).toBe(size)
+  }, 240_000)
 })
