@@ -1,8 +1,8 @@
-import { useState } from 'react'
 import type { ReactNode } from 'react'
+import type { StyleSpecification } from 'maplibre-gl'
 import { CATEGORY_GROUPS } from '../../lib/categories'
 import { readCategory } from '../../lib/styleMap'
-import type { Val } from '../../lib/styleMap'
+import type { LayerMap, Val } from '../../lib/styleMap'
 import { useMapStore } from '../../stores/mapStore'
 
 const MIXED_LABEL = 'Mixed'
@@ -25,6 +25,26 @@ function hexColorOf(value: Val<string>): string | null {
 
 function percentOf(value: Val<number>): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? Math.round(value * 100) : null
+}
+
+interface LooseLayer {
+  id: string
+  layout?: Record<string, unknown>
+  paint?: Record<string, unknown>
+}
+
+function labelIconsRenderedOf(style: StyleSpecification, layerMap: LayerMap, categoryId: string): boolean {
+  const entry = layerMap[categoryId]
+  if (!entry) return true
+  const labelIds = new Set(entry.labels)
+  let sawLabelLayer = false
+  for (const layer of ((style as { layers?: LooseLayer[] }).layers ?? [])) {
+    if (!labelIds.has(layer.id)) continue
+    sawLabelLayer = true
+    if (layer.layout?.visibility === 'none') continue
+    if (layer.paint?.['icon-opacity'] !== 0) return true
+  }
+  return !sawLabelLayer
 }
 
 function EyeIcon({ visible }: { visible: boolean }) {
@@ -142,11 +162,11 @@ export default function CategoryDetailPanel() {
   const style = useMapStore((state) => state.style)
   const layerMap = useMapStore((state) => state.layerMap)
   const patchCategory = useMapStore((state) => state.patchCategory)
-  const [labelIconVisible, setLabelIconVisible] = useState(true)
 
   if (selectedId === null || !style) return null
 
   const state = readCategory(style, layerMap, selectedId)
+  const labelIconsVisible = labelIconsRenderedOf(style, layerMap, selectedId)
 
   const toggleGeometryVisible = () => {
     const current = useMapStore.getState()
@@ -163,10 +183,10 @@ export default function CategoryDetailPanel() {
   }
 
   const toggleLabelIconVisible = () => {
-    if (selectedId === null) return
-    const next = !labelIconVisible
-    setLabelIconVisible(next)
-    patchCategory(selectedId, { labelIconVisible: next })
+    const current = useMapStore.getState()
+    if (!current.style || selectedId === null) return
+    const nowVisible = labelIconsRenderedOf(current.style, current.layerMap, selectedId)
+    current.patchCategory(selectedId, { labelIconVisible: !nowVisible })
   }
 
   return (
@@ -238,7 +258,7 @@ export default function CategoryDetailPanel() {
       <Section
         title="Label icon"
         eyeLabel="Toggle Label icon visibility"
-        visible={labelIconVisible}
+        visible={labelIconsVisible}
         onToggle={toggleLabelIconVisible}
       >
         <ColorField

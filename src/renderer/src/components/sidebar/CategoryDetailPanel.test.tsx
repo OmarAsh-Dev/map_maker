@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import '@testing-library/jest-dom/vitest'
 import type { StyleSpecification } from 'maplibre-gl'
@@ -20,8 +20,8 @@ vi.mock('maplibre-gl', () => ({
 const FIXTURE_LAYER_MAP: LayerMap = {
   water: { fill: ['water-fill'], casing: ['water-casing'], labels: ['water-label'] },
   landscape: { fill: ['landuse-fill'], casing: [], labels: [] },
-  road: { fill: ['road-a', 'road-b'], casing: [], labels: [] },
-  'road.highway': { fill: ['road-a'], casing: [], labels: [] },
+  road: { fill: ['road-a', 'road-b'], casing: [], labels: ['road-label'] },
+  'road.highway': { fill: ['road-a'], casing: [], labels: ['road-label'] },
 }
 
 const FIXTURE_STYLE = {
@@ -37,6 +37,11 @@ const FIXTURE_STYLE = {
     },
     { id: 'road-a', type: 'fill', paint: { 'fill-color': '#111111', 'fill-opacity': 1 } },
     { id: 'road-b', type: 'fill', paint: { 'fill-color': '#222222', 'fill-opacity': 1 } },
+    {
+      id: 'road-label',
+      type: 'symbol',
+      paint: { 'text-color': '#333333', 'icon-opacity': 1 },
+    },
     {
       id: 'landuse-fill',
       type: 'fill',
@@ -163,4 +168,26 @@ it('label icon eye and color input patch label icon fields', () => {
   fireEvent.change(screen.getByLabelText('Label icon color'), { target: { value: '#123456' } })
   state = useMapStore.getState()
   expect(paintOf(state.style as StyleSpecification, 'water-label', 'icon-color')).toBe('#123456')
+})
+
+it('label icon eye reflects the newly selected category style instead of stale local state', () => {
+  useMapStore.getState().selectCategory('water')
+  render(<CategoryDetailPanel />)
+  fireEvent.click(screen.getByRole('button', { name: 'Toggle Label icon visibility' }))
+  let state = useMapStore.getState()
+  expect(paintOf(state.style as StyleSpecification, 'water-label', 'icon-opacity')).toBe(0)
+  expect(screen.getByRole('button', { name: 'Toggle Label icon visibility' })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
+
+  act(() => {
+    useMapStore.getState().selectCategory('road.highway')
+  })
+  const eye = screen.getByRole('button', { name: 'Toggle Label icon visibility' })
+  expect(eye).toHaveAttribute('aria-pressed', 'false')
+
+  fireEvent.click(eye)
+  state = useMapStore.getState()
+  expect(paintOf(state.style as StyleSpecification, 'road-label', 'icon-opacity')).toBe(0)
 })
