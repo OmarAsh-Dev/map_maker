@@ -67,4 +67,20 @@ describe('compositeChunks', () => {
     expect(bl).toEqual([0, 0, 255])
     expect(br).toEqual([255, 255, 0])
   })
+
+  it('composites a square 16k output past sharp default input pixel limit', async () => {
+    const size = 16384
+    const chunk = await sharp({
+      create: { width: size, height: size, channels: 4, background: { r: 5, g: 6, b: 7, alpha: 1 } },
+      limitInputPixels: false,
+    })
+      .png()
+      .toBuffer()
+
+    const png = await compositeChunks([{ col: 0, row: 0, png: chunk }], 1, 1, size, size, size)
+
+    const meta = await sharp(png, { limitInputPixels: false }).metadata()
+    expect(meta.width).toBe(size)
+    expect(meta.height).toBe(size)
+  }, 240_000)
 })

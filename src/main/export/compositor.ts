@@ -19,6 +19,7 @@ export async function compositeChunks(
 
   const base = sharp({
     create: { width: gridWidth, height: gridHeight, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    limitInputPixels: false,
   })
   const composited = await (chunks.length > 0
     ? base.composite(
@@ -26,6 +27,7 @@ export async function compositeChunks(
           input: chunk.png,
           left: chunk.col * chunkPx,
           top: chunk.row * chunkPx,
+          limitInputPixels: false,
         }))
       )
     : base
@@ -54,12 +56,14 @@ export async function compositeChunks(
 
   return sharp({
     create: { width: outWidth, height: outHeight, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    limitInputPixels: false,
   })
     .composite([
       {
         input: cropped,
         left: Math.floor((outWidth - cropWidth) / 2),
         top: Math.floor((outHeight - cropHeight) / 2),
+        limitInputPixels: false,
       },
     ])
     .png()
