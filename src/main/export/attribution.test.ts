@@ -55,4 +55,11 @@ describe('renderAttributionPng', () => {
     const largeLit = await lit(large)
     expect(largeLit).toBeGreaterThan(smallLit * 4)
   })
+
+  it('renders a square 16k overlay past sharp default input pixel limit', async () => {
+    const png = await renderAttributionPng(16384, 16384, '© OpenStreetMap contributors')
+    const meta = await sharp(png, { limitInputPixels: false }).metadata()
+    expect(meta.width).toBe(16384)
+    expect(meta.height).toBe(16384)
+  }, 180_000)
 })

@@ -20,7 +20,7 @@ export function renderAttributionPng(
     `</svg>`,
   ].join(' ')
 
-  return sharp(Buffer.from(svg)).png().toBuffer()
+  return sharp(Buffer.from(svg), { limitInputPixels: false }).png().toBuffer()
 }
 
 function escapeXml(text: string): string {

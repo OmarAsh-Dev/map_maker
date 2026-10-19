@@ -38,7 +38,7 @@ export async function compositeChunks(
   const cropped =
     cropWidth === gridWidth && cropHeight === gridHeight
       ? composited
-      : await sharp(composited)
+      : await sharp(composited, { limitInputPixels: false })
           .extract({
             left: Math.floor((gridWidth - cropWidth) / 2),
             top: Math.floor((gridHeight - cropHeight) / 2),
