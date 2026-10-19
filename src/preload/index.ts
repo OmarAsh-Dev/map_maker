@@ -17,7 +17,7 @@ const api = {
   deletePreset: (name: string): Promise<void> =>
     ipcRenderer.invoke('presets:delete', name),
   beginExport: (spec: ExportJobSpec): void => {
-    ipcRenderer.send('export:begin', spec)
+    void ipcRenderer.invoke('export:begin', spec)
   },
   sendChunk: (groupLabel: string, col: number, row: number, png: ArrayBuffer): void => {
     ipcRenderer.send('export:chunk', groupLabel, col, row, png)
