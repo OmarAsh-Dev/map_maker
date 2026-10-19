@@ -3,26 +3,26 @@
 // (dev builds only - main.tsx dead-code-eliminates this import in production).
 //
 // Renders a 2048px-equivalent region twice - once as a 2x2 grid of 1024px
-// chunks via ChunkRenderer (flat pass), once as a single 2048px map - then
-// compares pixels: 20 sample points (mean per-channel diff < 2 required) and
-// the seam column x=1024 +/- 1 for discontinuity.
+// chunks via ChunkRenderer (flat pass), once as a single map of the same
+// pixel size - then compares pixels: 20 sample points (mean per-channel
+// diff < 2 required) and the seam column x=1024 +/- 1 for discontinuity.
 //
-// The region is the FULL WORLD at long edge 2048: planChunks(FULL_WORLD,
-// 2048, 1024) yields exactly cols=2, rows=2, zoom=2, actual 2048x2048, and
-// chunk.lng/lat are then world-anchored (region origin == world origin), so
-// the plan is exercised exactly as committed without reinterpreting it.
-// NOTE: for non-full-world bounds, planChunks' chunk centers are computed
-// from the world origin (0,0), so chunk.lng/lat point at the wrong
-// geography - reported to the orchestrator for Task 8.
+// Regional verification run: bounds are a London crop, which yields
+// exactly cols=2, rows=2 (actual 2048x1096, partial bottom row) and, since
+// chunk centers now honor regional bounds origin (3912ae4), the rendered
+// geography must be the requested crop - confirmed via a landmark-name
+// probe over rendered features and the pixel comparison against the
+// single-map reference centered on the same bounds.
 import { Map as MaplibreMap } from 'maplibre-gl'
 import type { ErrorEvent, StyleSpecification } from 'maplibre-gl'
-import { planChunks, worldPxToLngLat } from '../lib/chunkPlan'
+import { lngLatToWorldPx, planChunks, worldPxToLngLat } from '../lib/chunkPlan'
 import type { CropBounds } from '../lib/chunkPlan'
 import { ChunkRenderer } from '../lib/chunkRenderer'
 import { dataUrlToArrayBuffer } from '../lib/pngDataUrl'
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty'
-const FULL_WORLD: CropBounds = { west: -180, east: 180, south: -85.051129, north: 85.051129 }
+const REGION: CropBounds = { west: -0.2, east: 0.1, south: 51.45, north: 51.55 }
+const LANDMARK_PATTERN = /london|thames|westminster|piccadilly|oxford|camden|shoreditch|greenwich/i
 const STEP_TIMEOUT_MS = 60_000
 
 type Log = (msg: string) => void
@@ -146,10 +146,11 @@ async function runSelfTest(log: Log, gallery: HTMLElement): Promise<void> {
   log(`fetching style ${STYLE_URL}`)
   const style = (await withTimeout('fetch style', fetch(STYLE_URL).then((r) => r.json()))) as StyleSpecification
 
-  const plan = planChunks(FULL_WORLD, 2048, 1024)
+  const plan = planChunks(REGION, 2048, 1024)
   log(
     `plan: zoom=${plan.zoom.toFixed(4)} actual=${plan.actualWidth}x${plan.actualHeight} ` +
-      `cols=${plan.cols} rows=${plan.rows} chunkPx=${plan.chunkPx} chunks=${plan.chunks.length}`
+      `cols=${plan.cols} rows=${plan.rows} chunkPx=${plan.chunkPx} chunks=${plan.chunks.length} ` +
+      `firstChunkLngLat=${plan.chunks[0]?.lng.toFixed(4)},${plan.chunks[0]?.lat.toFixed(4)}`
   )
 
   // --- chunk renders via ChunkRenderer --------------------------------------
@@ -216,11 +217,35 @@ async function runSelfTest(log: Log, gallery: HTMLElement): Promise<void> {
   const refMap = new MaplibreMap(refOptions)
   logMapErrors('reference', refMap, log)
   let refPng: ArrayBuffer
+  let geographyNames: string[] = []
   try {
     await withTimeout('reference load', onceMapEvent(refMap, 'load'))
-    const refCenter = worldPxToLngLat(plan.actualWidth / 2, plan.actualHeight / 2, plan.zoom)
+    const origin = lngLatToWorldPx(REGION.west, REGION.north, plan.zoom)
+    const refCenter = worldPxToLngLat(
+      origin.x + plan.actualWidth / 2,
+      origin.y + plan.actualHeight / 2,
+      plan.zoom
+    )
     refMap.jumpTo({ center: [refCenter.lng, refCenter.lat], zoom: plan.zoom, bearing: 0, pitch: 0 })
     await withTimeout('reference idle', onceMapEvent(refMap, 'idle'))
+    const renderedCenter = refMap.getCenter()
+    const insideBounds =
+      renderedCenter.lng >= REGION.west &&
+      renderedCenter.lng <= REGION.east &&
+      renderedCenter.lat >= REGION.south &&
+      renderedCenter.lat <= REGION.north
+    log(
+      `geography: reference center=${renderedCenter.lng.toFixed(5)},${renderedCenter.lat.toFixed(5)} ` +
+        `insideRequestedBounds=${insideBounds}`
+    )
+    for (const feature of refMap.queryRenderedFeatures()) {
+      const name = (feature.properties as { name?: unknown } | undefined)?.name
+      if (typeof name === 'string' && LANDMARK_PATTERN.test(name) && !geographyNames.includes(name)) {
+        geographyNames.push(name)
+        if (geographyNames.length >= 8) break
+      }
+    }
+    log(`geography: landmark names rendered in reference: ${JSON.stringify(geographyNames)}`)
     refPng = dataUrlToArrayBuffer(refMap.getCanvas().toDataURL('image/png'))
   } finally {
     refMap.remove()
@@ -305,12 +330,16 @@ async function runSelfTest(log: Log, gallery: HTMLElement): Promise<void> {
 
   const samplesPass = sampleMean.every((m) => m < 2)
   const seamPass = ratio.every((r) => r < 2)
-  const verdict = samplesPass && seamPass ? 'PASS' : 'FAIL'
+  const geographyPass = geographyNames.length > 0
+  const verdict = samplesPass && seamPass && geographyPass ? 'PASS' : 'FAIL'
   log(
     `RESULT ${JSON.stringify({
       verdict,
       samplesPass,
       seamPass,
+      geographyPass,
+      geographyNames,
+      bounds: REGION,
       plan: {
         zoom: plan.zoom,
         actualWidth: plan.actualWidth,
