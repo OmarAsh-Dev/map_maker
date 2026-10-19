@@ -58,6 +58,42 @@ describe('planChunks', () => {
     expect(plan.actualHeight).toBe(2048)
   })
 
+  it('offsets regional chunk centers by the region origin in world px', () => {
+    const bounds: CropBounds = { west: -90, east: 90, south: -40.9767, north: 40.9767 }
+    const plan = planChunks(bounds, 4096, 1024)
+    expect(plan.zoom).toBe(4)
+    expect(plan.actualWidth).toBe(4096)
+    expect(plan.actualHeight).toBe(2048)
+    const first = plan.chunks[0]
+    expect(first.col).toBe(0)
+    expect(first.row).toBe(0)
+    expect(first.centerX).toBe(512)
+    expect(first.centerY).toBe(512)
+    expect(first.lng).toBe(-67.5)
+    expect(first.lat).toBeGreaterThan(-40.9767)
+    expect(first.lat).toBeLessThan(40.9767)
+    const last = plan.chunks[plan.chunks.length - 1]
+    expect(last.col).toBe(3)
+    expect(last.row).toBe(1)
+    expect(last.lng).toBe(67.5)
+    expect(last.lat).toBeGreaterThan(-40.9767)
+    expect(last.lat).toBeLessThan(40.9767)
+    expect(last.lng).toBeGreaterThan(first.lng)
+  })
+
+  it('keeps every chunk of a regional plan strictly inside the crop bounds', () => {
+    for (const chunkPx of [1024, 2048]) {
+      const plan = planChunks({ west: -90, east: 90, south: -40.9767, north: 40.9767 }, 4096, chunkPx)
+      expect(plan.chunks.length).toBeGreaterThan(0)
+      for (const chunk of plan.chunks) {
+        expect(chunk.lng).toBeGreaterThan(-90)
+        expect(chunk.lng).toBeLessThan(90)
+        expect(chunk.lat).toBeGreaterThan(-40.9767)
+        expect(chunk.lat).toBeLessThan(40.9767)
+      }
+    }
+  })
+
   it('clamps longEdgePx above MAX_EXPORT_PX', () => {
     const plan = planChunks(FULL_WORLD, 99999)
     expect(Math.max(plan.actualWidth, plan.actualHeight)).toBe(16384)

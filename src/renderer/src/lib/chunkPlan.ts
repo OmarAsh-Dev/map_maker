@@ -33,7 +33,8 @@ const SPAN_FLOOR = 1e-9
 function mercatorFraction(lat: number): number {
   const clamped = Math.max(-MAX_LAT, Math.min(MAX_LAT, lat))
   const phi = (clamped * Math.PI) / 180
-  return (1 - Math.log(Math.tan(phi) + 1 / Math.cos(phi)) / Math.PI) / 2
+  const fraction = (1 - Math.log(Math.tan(phi) + 1 / Math.cos(phi)) / Math.PI) / 2
+  return Math.min(1, Math.max(0, fraction))
 }
 
 function normalizeSpan(raw: number): number {
@@ -62,6 +63,8 @@ export function planChunks(bounds: CropBounds, longEdgePx: number, chunkPx: numb
   const zoom = Math.log2(worldPx / TILE_PX)
   const actualWidth = Math.round(worldPx * spanX)
   const actualHeight = Math.round(worldPx * spanY)
+  const originX = (worldPx * (bounds.west + 180)) / 360
+  const originY = worldPx * mercatorFraction(bounds.north)
   const cols = Math.ceil(actualWidth / tile)
   const rows = Math.ceil(actualHeight / tile)
   const chunks: Chunk[] = []
@@ -69,7 +72,7 @@ export function planChunks(bounds: CropBounds, longEdgePx: number, chunkPx: numb
     for (let col = 0; col < cols; col++) {
       const centerX = col * tile + Math.min(tile, actualWidth - col * tile) / 2
       const centerY = row * tile + Math.min(tile, actualHeight - row * tile) / 2
-      const { lng, lat } = worldPxToLngLat(centerX, centerY, zoom)
+      const { lng, lat } = worldPxToLngLat(originX + centerX, originY + centerY, zoom)
       chunks.push({ col, row, centerX, centerY, lng, lat })
     }
   }
