@@ -3,6 +3,7 @@ import { planChunks } from './chunkPlan'
 import type { Chunk, ChunkPlan, CropBounds } from './chunkPlan'
 import { exportGroups } from './maskPasses'
 import type { PassKind } from './maskPasses'
+import { scaleStyleForExport } from './scaleStyle'
 import type { LayerMap } from './styleMap'
 
 const FLAT_GROUP = 'Flat'
@@ -67,14 +68,22 @@ export interface RunExportOptions {
   layerMap: LayerMap
   outPath: string
   attribution: boolean
+  cropZoom?: number | null
   renderer?: ExportRenderer
   onProgress: (done: number, total: number) => void
   signal: AbortSignal
 }
 
+export function exportScaleFactor(planZoom: number, cropZoom: number | null | undefined): number {
+  if (cropZoom == null || !Number.isFinite(cropZoom)) return 1
+  return Math.max(1, Math.pow(2, planZoom - cropZoom))
+}
+
 export async function runExport(opts: RunExportOptions): Promise<void> {
   const plan = planChunks(opts.bounds, opts.longEdgePx)
-  const groups = opts.mode === 'flat' ? [] : exportGroups(opts.layerMap, opts.style)
+  const factor = exportScaleFactor(plan.zoom, opts.cropZoom)
+  const scaledStyle = scaleStyleForExport(opts.style, factor)
+  const groups = opts.mode === 'flat' ? [] : exportGroups(opts.layerMap, scaledStyle)
   const passes = computePasses(opts.mode, groups)
   if (opts.signal.aborted) {
     throw new Error('Export cancelled')
@@ -105,14 +114,14 @@ export async function runExport(opts: RunExportOptions): Promise<void> {
     let done = 0
     opts.onProgress(0, total)
     if (total > 0) {
-      await renderer.ensureStyle(opts.style)
+      await renderer.ensureStyle(scaledStyle)
     }
     for (const { pass, groupLabel } of passes) {
       for (const chunk of plan.chunks) {
         if (opts.signal.aborted) {
           throw new Error('Export cancelled')
         }
-        const image = await renderer.renderChunk(plan, chunk, pass, opts.layerMap, opts.style)
+        const image = await renderer.renderChunk(plan, chunk, pass, opts.layerMap, scaledStyle)
         window.api.sendChunk(groupLabel, image.col, image.row, image.png)
         done += 1
         opts.onProgress(done, total)

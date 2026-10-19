@@ -88,12 +88,15 @@ export default function CropOverlay() {
     if (!map) return
     const northwest = map.unproject([left, top])
     const southeast = map.unproject([right, bottom])
-    useExportStore.getState().setCropBounds({
-      west: northwest.lng,
-      north: northwest.lat,
-      east: southeast.lng,
-      south: southeast.lat,
-    })
+    useExportStore.getState().setCropBounds(
+      {
+        west: northwest.lng,
+        north: northwest.lat,
+        east: southeast.lng,
+        south: southeast.lat,
+      },
+      map.getZoom()
+    )
   }
 
   const rect = dragRect ?? savedRect

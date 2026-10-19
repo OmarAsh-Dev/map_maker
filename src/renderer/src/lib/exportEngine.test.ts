@@ -10,7 +10,7 @@ import { planChunks } from './chunkPlan'
 import type { Chunk, ChunkPlan, CropBounds } from './chunkPlan'
 import type { LayerMap } from './styleMap'
 import type { PassKind } from './maskPasses'
-import { runExport } from './exportEngine'
+import { exportScaleFactor, runExport } from './exportEngine'
 import type { ExportChunkImage, ExportRenderer } from './exportEngine'
 import { ExportSession } from '../../../main/export/exportSession'
 import type { ExportJobSpec } from '../../../main/export/exportSession'
@@ -37,8 +37,18 @@ const STYLE = {
   layers: [
     { id: 'water-fill', type: 'fill', paint: { 'fill-color': '#1191bd' } },
     { id: 'water-label', type: 'symbol', paint: { 'text-color': '#22506b' } },
-    { id: 'road-highway', type: 'line', paint: { 'line-color': '#e892a2' } },
-    { id: 'road-highway-label', type: 'symbol', paint: { 'text-color': '#333333' } },
+    {
+      id: 'road-highway',
+      type: 'line',
+      paint: { 'line-color': '#e892a2', 'line-width': 2 },
+      layout: { 'line-join': 'round' },
+    },
+    {
+      id: 'road-highway-label',
+      type: 'symbol',
+      paint: { 'text-color': '#333333', 'text-halo-width': 1.5 },
+      layout: { 'text-size': 12 },
+    },
   ],
 } as unknown as StyleSpecification
 
@@ -339,5 +349,42 @@ describe('runExport', () => {
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('wysiwyg style scaling', () => {
+  it('scales px-denominated style props by 2^(derivedZoom - cropZoom) before rendering', async () => {
+    const { renderer, renderChunk } = createFakeRenderer()
+    const plan = planChunks(BASE_BOUNDS, 4096)
+    const cropZoom = plan.zoom - 1 // exactly one zoom level below the derived zoom
+    await runExport(baseOpts({ renderer, cropZoom }))
+
+    expect(renderChunk).toHaveBeenCalled()
+    const passedStyle = (renderChunk.mock.calls[0] as unknown[])[4] as {
+      layers: Array<{ id: string; paint?: Record<string, unknown>; layout?: Record<string, unknown> }>
+    }
+    const road = passedStyle.layers.find((l) => l.id === 'road-highway')!
+    const label = passedStyle.layers.find((l) => l.id === 'road-highway-label')!
+    expect(road.paint!['line-width']).toBe(4) // 2 × 2
+    expect(label.paint!['text-halo-width']).toBe(3) // 1.5 × 2
+    expect(label.layout!['text-size']).toBe(24) // 12 × 2
+  })
+
+  it('passes the style through unchanged when no crop zoom is known', async () => {
+    const { renderer, renderChunk } = createFakeRenderer()
+    await runExport(baseOpts({ renderer, cropZoom: null }))
+
+    const passedStyle = (renderChunk.mock.calls[0] as unknown[])[4] as {
+      layers: Array<{ id: string; paint?: Record<string, unknown> }>
+    }
+    const road = passedStyle.layers.find((l) => l.id === 'road-highway')!
+    expect(road.paint!['line-width']).toBe(2)
+  })
+
+  it('exportScaleFactor never scales down and treats missing zoom as 1', () => {
+    expect(exportScaleFactor(14, 12)).toBe(4)
+    expect(exportScaleFactor(12, 14)).toBe(1)
+    expect(exportScaleFactor(14, null)).toBe(1)
+    expect(exportScaleFactor(14, undefined)).toBe(1)
   })
 })

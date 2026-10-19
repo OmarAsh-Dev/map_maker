@@ -57,6 +57,7 @@ export interface ExportState {
   mapInstance: MaplibreMap | null
   cropMode: boolean
   cropBounds: CropBounds | null
+  cropZoom: number | null
   dialogOpen: boolean
   mode: ExportMode
   container: ExportContainer
@@ -75,7 +76,7 @@ export interface ExportState {
   abortController: AbortController | null
   setMapInstance(map: MaplibreMap | null): void
   setCropMode(active: boolean): void
-  setCropBounds(bounds: CropBounds | null): void
+  setCropBounds(bounds: CropBounds | null, zoom?: number): void
   setDialogOpen(open: boolean): void
   setMode(mode: ExportMode): void
   setContainer(container: ExportContainer): void
@@ -93,6 +94,7 @@ export const useExportStore = create<ExportState>()((set, get) => ({
   mapInstance: null,
   cropMode: false,
   cropBounds: null,
+  cropZoom: null,
   dialogOpen: false,
   mode: 'flat',
   container: 'psd',
@@ -111,7 +113,18 @@ export const useExportStore = create<ExportState>()((set, get) => ({
   abortController: null,
   setMapInstance: (map) => set({ mapInstance: map }),
   setCropMode: (active) => set({ cropMode: active }),
-  setCropBounds: (bounds) => set({ cropBounds: bounds }),
+  setCropBounds: (bounds, zoom) => {
+    if (!bounds) {
+      set({ cropBounds: null, cropZoom: null })
+      return
+    }
+    const preset = ASPECT_RATIO_PRESETS.find((entry) => entry.id === get().aspectRatio)
+    set({
+      cropBounds:
+        preset && preset.ratio !== null ? adjustBoundsToRatio(bounds, preset.ratio) : bounds,
+      cropZoom: zoom ?? get().cropZoom,
+    })
+  },
   setDialogOpen: (open) => set({ dialogOpen: open }),
   setMode: (mode) => set({ mode }),
   setContainer: (container) => set({ container }),
