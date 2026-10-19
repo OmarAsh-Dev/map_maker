@@ -1,7 +1,7 @@
 # map_maker — v1 Design
 
 Date: 2026-10-19
-Status: approved by product owner (chat), pending build plan
+Status: approved by product owner (chat); builder check resolved; ready for planning
 
 ## Intent and why
 
@@ -32,7 +32,9 @@ Reference product: <https://mapbuilder.app/map> — the UI should feel immediate
 5. **Presets**: save and load the current style locally as JSON.
 6. **Attribution**: included by default; removable after an explicit warning dialog stating that OSM's license (ODbL) and OpenFreeMap's terms require attribution in published media including video, and that removing it is the user's responsibility.
 
-The map view is **strictly top-down in v1**: pitch is locked at 0 (bearing rotation is allowed — it stitches seam-free). This keeps 16k stitched exports geometrically exact.
+## Camera (v1)
+
+The map view is **strictly top-down**: pitch is locked at 0 (product owner confirmed). Bearing rotation is allowed — it stitches seam-free. This keeps 16k stitched exports geometrically exact.
 
 ## Non-goals (v1)
 
@@ -41,6 +43,7 @@ The map view is **strictly top-down in v1**: pitch is locked at 0 (bearing rotat
 - Accounts, cloud sync, sharing, collaboration, purchases.
 - Label language switching (the "EN" pill in the reference).
 - Auto-updater, telemetry, crash reporting.
+- Code signing (product owner confirmed: ship unsigned; users see a one-time SmartScreen prompt).
 
 ## Anti-goals
 
@@ -51,7 +54,7 @@ The map view is **strictly top-down in v1**: pitch is locked at 0 (bearing rotat
 
 - **Tiles**: OpenFreeMap only. No API key, no registration — never add one or ask the user for one. Vector tiles rendered with **MapLibre GL JS**; styles are URLs like `https://tiles.openfreemap.org/styles/liberty`. Feature editing happens through the MapLibre style spec (layers / paint properties), not raster recoloring.
 - **Stack** (decided): React + TypeScript + Tailwind CSS in Electron; Windows 10/11 x64.
-- **Deliverable**: `electron-builder` with the **zip** target (NSIS disabled) — a zip containing the standalone exe. The exe ships **unsigned**; users see a one-time SmartScreen prompt (product owner accepted this). The exe ships **unsigned**; users see a one-time SmartScreen prompt (product owner accepted this).
+- **Deliverable**: `electron-builder` with the **zip** target (NSIS disabled) — a zip containing the standalone **unsigned** exe (product owner confirmed; users see a one-time SmartScreen prompt).
 - **License**: OSM data is ODbL; attribution must be offered (see Goals #6).
 
 ## Decisions the product owner made
@@ -63,14 +66,17 @@ The map view is **strictly top-down in v1**: pitch is locked at 0 (bearing rotat
 | Style editing | Category tree + detail panel, exactly like mapbuilder.app (screenshots provided) |
 | v1 scope | Style the map, crop, export — nothing else |
 | Packaging | Zip containing the exe; no installer |
+| Layered labels | Labels export with their category (geometry + labels sub-layers) |
+| Camera | Top-down only; pitch locked at 0 |
+| Attribution removal | Warning + accept; user assumes ODbL obligation |
+| Code signing | Ship unsigned; one-time SmartScreen prompt accepted |
 
 ## Calls made by the designer (veto welcome)
 
-- PSD written with `ag-psd`; PNG folder mode reuses the same per-group renders.
+- PSD written with `ag-psd`; PNG folder mode reuses the same per-group renders. Fall back to **PSB** (AE-compatible) when a multi-layer 16k file would exceed classic PSD limits.
 - Presets stored as JSON in the user's app-data directory.
 - Build tooling: Vite (renderer) + electron-builder (packaging).
-- Default basemap: OpenFreeMap `liberty`; its other styles selectable as basemap presets.
-- Attribution removable only after a warning dialog.
+- Default basemap: OpenFreeMap `liberty`; its other hosted styles (Bright, Positron, Dark, Fiord, …) selectable as basemap presets.
 - No auto-updater; new versions are new zips.
 
 ## Left to the builder
@@ -78,21 +84,6 @@ The map view is **strictly top-down in v1**: pitch is locked at 0 (bearing rotat
 - The mapping table from OpenFreeMap style layers (per style) to the category tree and sub-items, including which style-spec properties back Fill / Stroke / Opacity / Label sections.
 - Tile-stitch rendering: chunk math, seam consistency (labels and road casing across chunk boundaries), memory strategy (a 16k RGBA canvas is ~1 GiB per layer; layered PSD assembly must be chunked).
 - Electron process architecture (main/renderer split, IPC for file dialogs and export pipeline), folder structure, state management, and test framework.
-- PSD layer ordering and naming so the AE import is immediately usable.
-## Left to the builder
-
-- The mapping table from OpenFreeMap style layers (per style) to the category tree and sub-items, including which style-spec properties back Fill / Stroke / Opacity / Label sections.
-- Tile-stitch rendering: chunk math, seam consistency (labels and road casing across chunk boundaries), memory strategy (a 16k RGBA canvas is ~1 GiB per layer; layered PSD assembly must be chunked).
-- Electron process architecture (main/renderer split, IPC for file dialogs and export pipeline), folder structure, state management, and test framework.
 - PSD layer ordering and naming so the AE import is immediately usable; fall back to PSB (AE-compatible) if a 16k multi-layer file exceeds classic PSD limits.
-- Tile fetching etiquette: conservative request caps (~4 parallel), disk cache, and a User-Agent identifying the app, per OpenFreeMap ToS.
+- Tile fetching etiquette per OpenFreeMap ToS: conservative caps (≈4 parallel requests), disk cache, and a User-Agent identifying the app (e.g. `map_maker/0.1`).
 - Exact attribution string and placement.
-
-## Builder-check resolutions (2026-10-19)
-
-Reviewed by a fresh builder subagent; product owner resolved the open items:
-
-- **Layered labels**: labels live with their group — each category exports as geometry + labels sub-layers (product owner confirmed).
-- **Camera**: exports are strictly top-down; pitch locked at 0 in v1 (product owner confirmed).
-- **Attribution removal**: warning + accept; user assumes ODbL obligation (product owner confirmed).
-- **Code signing**: ship unsigned; one-time SmartScreen prompt accepted (product owner confirmed).
