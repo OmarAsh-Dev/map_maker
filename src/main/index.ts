@@ -1,5 +1,17 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
+import { PresetStore } from './presets'
+
+function registerIpcHandlers(): void {
+  const presets = new PresetStore(join(app.getPath('userData'), 'presets'))
+
+  ipcMain.handle('presets:save', (_event, name: string, styleJson: string) =>
+    presets.save(name, styleJson)
+  )
+  ipcMain.handle('presets:list', () => presets.list())
+  ipcMain.handle('presets:load', (_event, name: string) => presets.load(name))
+  ipcMain.handle('presets:delete', (_event, name: string) => presets.remove(name))
+}
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -25,6 +37,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  registerIpcHandlers()
   createWindow()
 
   app.on('activate', () => {
