@@ -185,6 +185,32 @@ describe('ExportSession layered mode', () => {
     ])
   })
 
+  it('awaits an in-flight composite when finish arrives before the last addChunk settles', async () => {
+    const outPath = join(dir, 'map.psd')
+    const events: ExportProgress[] = []
+    const session = new ExportSession(layeredSpec('psd', outPath), collector(events))
+
+    await session.addChunk('Roads', { col: 0, row: 0, png: await solidPng(0, 0, 255, 32) })
+    const lastChunk = session.addChunk('Roads labels', {
+      col: 0,
+      row: 0,
+      png: await solidPng(255, 0, 0, 32),
+    })
+    await session.finish()
+    await lastChunk
+
+    expect(events).toEqual([
+      { stage: 'compositing', group: 'Roads', done: 1, total: 2 },
+      { stage: 'compositing', group: 'Roads labels', done: 2, total: 2 },
+      { stage: 'assembling' },
+      { stage: 'done', path: outPath },
+    ])
+
+    const psd = readPsd(await readFile(outPath), { useImageData: true })
+    expect(psd.children![0].name).toBe('Roads labels')
+    expect(psd.children![1].name).toBe('Roads')
+  })
+
   it('reports an error and rejects finish when a group received zero chunks', async () => {
     const outPath = join(dir, 'map.psd')
     const events: ExportProgress[] = []

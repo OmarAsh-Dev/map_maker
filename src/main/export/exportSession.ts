@@ -39,6 +39,7 @@ export class ExportSession {
   private readonly onProgress: (p: ExportProgress) => void
   private readonly buckets = new Map<string, CompositorChunk[]>()
   private readonly composited = new Map<string, Buffer>()
+  private readonly inFlight = new Map<string, Promise<void>>()
   private readonly totalGroups: number
   private groupsDone = 0
   private cancelled = false
@@ -63,6 +64,13 @@ export class ExportSession {
 
     if (bucket.length !== this.spec.cols * this.spec.rows) return
 
+    const task = this.compositeGroup(key, bucket)
+    this.inFlight.set(key, task)
+    await task
+    if (this.failureMessage) throw new Error(this.failureMessage)
+  }
+
+  private async compositeGroup(key: string, bucket: CompositorChunk[]): Promise<void> {
     try {
       const png = await compositeChunks(
         bucket,
@@ -82,12 +90,17 @@ export class ExportSession {
         total: this.totalGroups,
       })
     } catch (err) {
-      this.fail(err instanceof Error ? err.message : String(err))
-      throw new Error(this.failureMessage!)
+      if (!this.failureMessage) {
+        this.fail(err instanceof Error ? err.message : String(err))
+      }
+    } finally {
+      this.inFlight.delete(key)
     }
   }
 
   async finish(): Promise<void> {
+    this.assertUsable()
+    await Promise.allSettled([...this.inFlight.values()])
     this.assertUsable()
 
     if (this.spec.mode === 'flat') {
