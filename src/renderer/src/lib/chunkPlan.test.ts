@@ -47,11 +47,15 @@ describe('planChunks', () => {
     expect(last.centerY).toBeLessThan(16384)
   })
 
-  it('scales a half-world square crop so its long edge matches longEdgePx', () => {
-    const plan = planChunks({ west: -90, east: 90, south: -66.51326, north: 66.51326 }, 4096)
+  // Controller ruling: the brief's original square-region fixture (±66.51326 lat) was
+  // arithmetically wrong (spanX=spanY=0.5 → actualHeight 4096); the formula is authoritative.
+  // This corrected 2:1 crop (spanX=0.5, spanY=0.25) preserves the fixture's purpose:
+  // verifying the short-edge computation.
+  it('scales a 2:1 crop to a 4096x2048 output at the requested long edge', () => {
+    const plan = planChunks({ west: -90, east: 90, south: -40.9767, north: 40.9767 }, 4096)
     expect(plan.zoom).toBe(4)
     expect(plan.actualWidth).toBe(4096)
-    expect(plan.actualHeight).toBe(4096)
+    expect(plan.actualHeight).toBe(2048)
   })
 
   it('clamps longEdgePx above MAX_EXPORT_PX', () => {
