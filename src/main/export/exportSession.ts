@@ -85,6 +85,7 @@ export class ExportSession {
       )
       if (this.cancelled) return
       this.composited.set(key, png)
+      this.buckets.delete(key)
       this.groupsDone++
       this.onProgress({
         stage: 'compositing',

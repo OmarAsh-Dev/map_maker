@@ -30,15 +30,46 @@ const TILE_PX = 512
 const MAX_LAT = 85.051129
 const SPAN_FLOOR = 1e-9
 
-function mercatorFraction(lat: number): number {
+export function mercatorFraction(lat: number): number {
   const clamped = Math.max(-MAX_LAT, Math.min(MAX_LAT, lat))
   const phi = (clamped * Math.PI) / 180
   const fraction = (1 - Math.log(Math.tan(phi) + 1 / Math.cos(phi)) / Math.PI) / 2
   return Math.min(1, Math.max(0, fraction))
 }
 
+function fractionToLat(fraction: number): number {
+  const clamped = Math.min(1, Math.max(0, fraction))
+  return (Math.atan(Math.sinh(Math.PI * (1 - 2 * clamped))) * 180) / Math.PI
+}
+
 function normalizeSpan(raw: number): number {
   return Math.min(1, Math.max(SPAN_FLOOR, raw))
+}
+
+export function adjustBoundsToRatio(bounds: CropBounds, ratio: number): CropBounds {
+  if (!Number.isFinite(ratio) || ratio <= 0) return bounds
+  const spanX = normalizeSpan((bounds.east - bounds.west) / 360)
+  const fSouth = mercatorFraction(bounds.south)
+  const fNorth = mercatorFraction(bounds.north)
+  const spanY = normalizeSpan(fSouth - fNorth)
+  let newSpanX = spanX
+  let newSpanY = spanY
+  if (spanX / spanY < ratio) {
+    newSpanX = Math.min(1, spanY * ratio)
+  } else {
+    newSpanY = Math.min(1, spanX / ratio)
+  }
+  const centerXF = (bounds.west + 180) / 360 + spanX / 2
+  const centerYF = fNorth + spanY / 2
+  const westF = Math.max(0, Math.min(1 - newSpanX, centerXF - newSpanX / 2))
+  const northF = Math.max(0, Math.min(1 - newSpanY, centerYF - newSpanY / 2))
+  const west = -180 + 360 * westF
+  return {
+    west,
+    east: west + 360 * newSpanX,
+    north: fractionToLat(northF),
+    south: fractionToLat(northF + newSpanY),
+  }
 }
 
 export function lngLatToWorldPx(lng: number, lat: number, zoom: number): { x: number; y: number } {

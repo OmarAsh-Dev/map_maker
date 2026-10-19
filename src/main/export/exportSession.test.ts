@@ -121,7 +121,7 @@ function layeredSpec(container: 'psd' | 'png-folder', outPath: string): ExportJo
     outHeight: 32,
     groups: [
       { id: 'roads', label: 'Roads' },
-      { id: 'roads-labels', label: 'Roads labels' },
+      { id: 'roads', label: 'Roads labels' },
     ],
     outPath,
     attribution: null,

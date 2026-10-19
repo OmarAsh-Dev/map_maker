@@ -97,6 +97,8 @@ export function applyPassMask(
   return next
 }
 
+const TOP_LEVEL_IDS = new Set(CATEGORY_GROUPS.map((group) => group.id))
+
 export function exportGroups(
   layerMap: LayerMap,
   style: StyleSpecification
@@ -112,6 +114,7 @@ export function exportGroups(
 
   const firstIndex = new Map<string, number>()
   for (const [id, entry] of Object.entries(layerMap)) {
+    if (!TOP_LEVEL_IDS.has(id)) continue
     let min: number | null = null
     let anyVisible = false
     for (const layerId of [...entry.fill, ...entry.casing, ...entry.labels]) {

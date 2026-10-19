@@ -7,6 +7,8 @@
 // compositor / ag-psd assembly -> files on disk. Output paths are fixed so
 // the file headers (PNG IHDR / PSD header) can be verified from a shell.
 // The native save dialog and GUI interactions are intentionally bypassed.
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { StyleSpecification } from 'maplibre-gl'
 import { buildLayerMapFromStyle } from '../lib/layerMapBuilder'
 import type { LayerMap } from '../lib/styleMap'
@@ -21,7 +23,7 @@ const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty'
 // snapshot is repopulated - re-check before relying on this harness at high
 // zoom.
 const REGION: CropBounds = { west: -0.35, east: 0.05, south: 51.3, north: 51.65 }
-const OUT_DIR = 'C:/Users/bdevl/AppData/Local/Temp/opencode/map-maker-selftest'
+const OUT_DIR = join(tmpdir(), 'map-maker-selftest')
 const STEP_TIMEOUT_MS = 240_000
 
 type Log = (msg: string) => void

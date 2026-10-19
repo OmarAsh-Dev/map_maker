@@ -6,6 +6,7 @@ import { applyPassMask, exportGroups } from './maskPasses'
 
 const MAP: LayerMap = {
   water: { fill: ['water-fill'], casing: [], labels: ['water-label'] },
+  road: { fill: ['road-highway'], casing: ['road-highway-casing'], labels: ['road-highway-label'] },
   'road.highway': { fill: ['road-highway'], casing: ['road-highway-casing'], labels: ['road-highway-label'] },
   poi: { fill: [], casing: [], labels: ['poi-icon', 'poi-label'] },
 }
@@ -95,13 +96,25 @@ describe('applyPassMask', () => {
 })
 
 describe('exportGroups', () => {
-  it('returns visible categories ordered bottom to top by first layer index', () => {
+  it('returns visible top-level categories ordered bottom to top by first layer index', () => {
     const groups = exportGroups(MAP, baseStyle)
 
     expect(groups).toEqual([
       { id: 'poi', label: 'Points of interest' },
-      { id: 'road.highway', label: 'Highway' },
+      { id: 'road', label: 'Road' },
     ])
+    expect(groups.map((group) => group.id)).not.toContain('road.highway')
+  })
+
+  it('excludes parent+child duplicates: a child-only entry never produces a second group', () => {
+    const waterShown = applyCategoryPatch(baseStyle, MAP, 'water', { visible: true })
+    const childOnly: LayerMap = {
+      water: { fill: ['water-fill'], casing: [], labels: ['water-label'] },
+      'road.highway': { fill: ['road-highway'], casing: [], labels: [] },
+    }
+    const groups = exportGroups(childOnly, waterShown)
+
+    expect(groups).toEqual([{ id: 'water', label: 'Water' }])
   })
 
   it('includes a category once its layers become visible again', () => {
@@ -111,7 +124,7 @@ describe('exportGroups', () => {
     expect(groups).toEqual([
       { id: 'water', label: 'Water' },
       { id: 'poi', label: 'Points of interest' },
-      { id: 'road.highway', label: 'Highway' },
+      { id: 'road', label: 'Road' },
     ])
   })
 })

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_EXPORT_PX, lngLatToWorldPx, planChunks, worldPxToLngLat } from './chunkPlan'
+import {
+  MAX_EXPORT_PX,
+  adjustBoundsToRatio,
+  lngLatToWorldPx,
+  mercatorFraction,
+  planChunks,
+  worldPxToLngLat,
+} from './chunkPlan'
 import type { CropBounds } from './chunkPlan'
 
 const FULL_WORLD: CropBounds = { west: -180, east: 180, south: -85.051129, north: 85.051129 }
@@ -123,6 +130,25 @@ describe('planChunks', () => {
     expect(Number.isFinite(plan.zoom)).toBe(true)
     expect(Number.isFinite(plan.actualHeight)).toBe(true)
   })
+
+  it('pulls partial edge chunk centers inward to the middle of the partial strip', () => {
+    const zoom = Math.log2(960 / 512)
+    const south = worldPxToLngLat(0, 960 * 0.55, zoom).lat
+    const north = worldPxToLngLat(0, 960 * 0.45, zoom).lat
+    const plan = planChunks({ west: 0, east: 36, south, north }, 96, 64)
+
+    expect(plan.actualWidth).toBe(96)
+    expect(plan.actualHeight).toBe(96)
+    expect(plan.cols).toBe(2)
+    expect(plan.rows).toBe(2)
+    expect(plan.chunks[1].col).toBe(1)
+    expect(plan.chunks[1].row).toBe(0)
+    expect(plan.chunks[1].centerX).toBe(64 + Math.min(64, 96 - 64) / 2)
+    expect(plan.chunks[1].centerX).toBe(80)
+    expect(plan.chunks[1].centerY).toBe(32)
+    expect(plan.chunks[2].centerY).toBe(80)
+    expect(plan.chunks[3].centerX).toBe(80)
+  })
 })
 
 describe('coordinate conversion', () => {
@@ -145,5 +171,74 @@ describe('coordinate conversion', () => {
     const px = lngLatToWorldPx(0, 0, 3)
     expect(px.x).toBe(2048)
     expect(px.y).toBe(2048)
+  })
+})
+
+describe('adjustBoundsToRatio', () => {
+  function squareMercatorBounds(): CropBounds {
+    return {
+      west: -18,
+      east: 18,
+      south: worldPxToLngLat(0, 512 * 0.55, 0).lat,
+      north: worldPxToLngLat(0, 512 * 0.45, 0).lat,
+    }
+  }
+
+  it('expands the lng span to reach 16:9 on a square bounds and preserves the center', () => {
+    const bounds = squareMercatorBounds()
+    expect(mercatorFraction(bounds.south) - mercatorFraction(bounds.north)).toBeCloseTo(0.1, 9)
+
+    const adjusted = adjustBoundsToRatio(bounds, 16 / 9)
+
+    expect((adjusted.east - adjusted.west) / 360).toBeCloseTo(0.1 * (16 / 9), 9)
+    expect(mercatorFraction(adjusted.south) - mercatorFraction(adjusted.north)).toBeCloseTo(0.1, 9)
+    expect(mercatorFraction(adjusted.south) - mercatorFraction(adjusted.north)).toBeCloseTo(
+      ((adjusted.east - adjusted.west) / 360) * (9 / 16),
+      6
+    )
+    expect((adjusted.east + adjusted.west) / 2).toBeCloseTo((bounds.east + bounds.west) / 2, 9)
+    expect((mercatorFraction(adjusted.south) + mercatorFraction(adjusted.north)) / 2).toBeCloseTo(
+      (mercatorFraction(bounds.south) + mercatorFraction(bounds.north)) / 2,
+      6
+    )
+  })
+
+  it('expands the mercator span to reach 9:16 on a square bounds and preserves the center', () => {
+    const bounds = squareMercatorBounds()
+
+    const adjusted = adjustBoundsToRatio(bounds, 9 / 16)
+
+    expect(adjusted.west).toBeCloseTo(bounds.west, 9)
+    expect(adjusted.east).toBeCloseTo(bounds.east, 9)
+    expect(mercatorFraction(adjusted.south) - mercatorFraction(adjusted.north)).toBeCloseTo(
+      0.1 * (16 / 9),
+      9
+    )
+    expect((mercatorFraction(adjusted.south) + mercatorFraction(adjusted.north)) / 2).toBeCloseTo(
+      0.5,
+      6
+    )
+  })
+
+  it('keeps square bounds effectively unchanged for 1:1', () => {
+    const bounds = squareMercatorBounds()
+
+    const adjusted = adjustBoundsToRatio(bounds, 1)
+
+    expect((adjusted.east - adjusted.west) / 360).toBeCloseTo((bounds.east - bounds.west) / 360, 9)
+    expect(mercatorFraction(adjusted.south) - mercatorFraction(adjusted.north)).toBeCloseTo(
+      mercatorFraction(bounds.south) - mercatorFraction(bounds.north),
+      9
+    )
+    expect((adjusted.east + adjusted.west) / 2).toBeCloseTo(0, 9)
+  })
+
+  it('clamps expansion that would leave the world instead of drifting the bounds', () => {
+    const edge: CropBounds = { west: -180, east: -144, south: -10, north: 10 }
+
+    const adjusted = adjustBoundsToRatio(edge, 16 / 9)
+
+    expect(adjusted.west).toBeGreaterThanOrEqual(-180)
+    expect(adjusted.east).toBeLessThanOrEqual(180)
   })
 })

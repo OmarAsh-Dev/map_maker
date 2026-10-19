@@ -143,10 +143,82 @@ describe('buildLayerMapFromStyle', () => {
     expect(hasEntry(layerMap, 'poi.transport', 'labels', 'poi_transit')).toBe(true)
   })
 
-  it('leaves unmatched layers out of every category', () => {
+  it('routes retail, historic and tourism ids to poi.shop and poi.landmark', () => {
+    const style = {
+      version: 8,
+      sources: {},
+      layers: [
+        { id: 'shop_retail_area', type: 'symbol', paint: {} },
+        { id: 'historic_monument_label', type: 'symbol', paint: {} },
+        { id: 'tourism_attraction_label', type: 'symbol', paint: {} },
+      ],
+    } as unknown as StyleSpecification
+    const layerMap = buildLayerMapFromStyle(style)
+
+    expect(hasEntry(layerMap, 'poi.shop', 'labels', 'shop_retail_area')).toBe(true)
+    expect(hasEntry(layerMap, 'poi', 'labels', 'shop_retail_area')).toBe(true)
+    expect(hasEntry(layerMap, 'poi.landmark', 'labels', 'historic_monument_label')).toBe(true)
+    expect(hasEntry(layerMap, 'poi.landmark', 'labels', 'tourism_attraction_label')).toBe(true)
+    expect(hasEntry(layerMap, 'poi.amenity', 'labels', 'shop_retail_area')).toBe(false)
+  })
+
+  it('routes bus, ferry, cablecar and street-limit ids to their transit and road categories', () => {
+    const style = {
+      version: 8,
+      sources: {},
+      layers: [
+        { id: 'bus_route_label', type: 'symbol', paint: {} },
+        { id: 'ferry_line', type: 'line', paint: {} },
+        { id: 'aerialway_cablecar', type: 'line', paint: {} },
+        { id: 'road_street_limited', type: 'line', paint: {} },
+        { id: 'tunnel_street_limits_casing', type: 'line', paint: {} },
+      ],
+    } as unknown as StyleSpecification
+    const layerMap = buildLayerMapFromStyle(style)
+
+    expect(hasEntry(layerMap, 'transit.bus', 'labels', 'bus_route_label')).toBe(true)
+    expect(hasEntry(layerMap, 'transit', 'labels', 'bus_route_label')).toBe(true)
+    expect(hasEntry(layerMap, 'transit.ferry', 'fill', 'ferry_line')).toBe(true)
+    expect(hasEntry(layerMap, 'transit.aerialway', 'fill', 'aerialway_cablecar')).toBe(true)
+    expect(hasEntry(layerMap, 'road.street-limits', 'fill', 'road_street_limited')).toBe(true)
+    expect(hasEntry(layerMap, 'road.street-limits', 'casing', 'tunnel_street_limits_casing')).toBe(true)
+    expect(hasEntry(layerMap, 'road', 'fill', 'road_street_limited')).toBe(true)
+  })
+
+  it('lands unmatched road-name symbols in road.others labels', () => {
+    const style = {
+      version: 8,
+      sources: {},
+      layers: [{ id: 'road_name_5', type: 'symbol', paint: {} }],
+    } as unknown as StyleSpecification
+    const layerMap = buildLayerMapFromStyle(style)
+
+    expect(hasEntry(layerMap, 'road.others', 'labels', 'road_name_5')).toBe(true)
+  })
+
+  it('lands place-class other labels in administrative.settlement', () => {
     const layerMap = buildLayerMapFromStyle(FIXTURE_STYLE)
-    const ids = allLayerIds(layerMap)
-    expect(ids).not.toContain('natural_earth')
-    expect(ids).not.toContain('label_other')
+    expect(hasEntry(layerMap, 'administrative.settlement', 'labels', 'label_other')).toBe(true)
+    expect(hasEntry(layerMap, 'administrative', 'labels', 'label_other')).toBe(true)
+    expect(hasEntry(layerMap, 'road.others', 'labels', 'label_other')).toBe(false)
+  })
+
+  it('keeps genuinely unmatched categories empty on real liberty-style layer ids', () => {
+    const layerMap = buildLayerMapFromStyle(FIXTURE_STYLE)
+    for (const id of [
+      'poi.shop',
+      'poi.landmark',
+      'road.street-limits',
+      'transit.bus',
+      'transit.ferry',
+      'transit.aerialway',
+    ]) {
+      expect(layerMap[id]).toEqual({ fill: [], casing: [], labels: [] })
+    }
+  })
+
+  it('keeps raster layers out of every category', () => {
+    const layerMap = buildLayerMapFromStyle(FIXTURE_STYLE)
+    expect(allLayerIds(layerMap)).not.toContain('natural_earth')
   })
 })

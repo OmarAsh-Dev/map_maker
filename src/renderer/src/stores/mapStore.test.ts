@@ -64,9 +64,10 @@ describe('mapStore', () => {
     expect(useMapStore.getState().selectedCategoryId).toBeNull()
   })
 
-  it('setBasemap replaces basemapUrl + layerMap and discards overridden style', () => {
+  it('setBasemap replaces basemapUrl + layerMap, discards overridden style, and clears the selection', () => {
     useMapStore.getState().styleLoaded(makeStyle('#aaaaaa', '#eecc66'), LAYER_MAP)
     useMapStore.getState().patchCategory('water', { geometryFill: '#ff0000' })
+    useMapStore.getState().selectCategory('water')
 
     const nextMap: LayerMap = { water: { fill: ['ocean'], casing: [], labels: [] } }
     useMapStore
@@ -77,6 +78,7 @@ describe('mapStore', () => {
     expect(state.basemapUrl).toBe('https://tiles.openfreemap.org/styles/bright')
     expect(state.layerMap).toBe(nextMap)
     expect(state.style).toBeNull()
+    expect(state.selectedCategoryId).toBeNull()
 
     const fresh = {
       version: 8,

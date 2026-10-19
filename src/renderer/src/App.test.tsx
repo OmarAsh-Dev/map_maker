@@ -23,6 +23,7 @@ vi.mock('maplibre-gl', () => ({
     }
   },
   setWorkerUrl: () => {},
+  setMaxParallelImageRequests: () => {},
 }))
 
 const STYLE_A = {
@@ -78,5 +79,46 @@ describe('store to map style sync', () => {
     })
     expect(map.setStyle).toHaveBeenCalledTimes(2)
     expect(map.setStyle).toHaveBeenCalledWith(STYLE_B)
+  })
+
+  it('skips re-applying the identical style object to the live map', () => {
+    render(<App />)
+    const map = mapInstances[mapInstances.length - 1]
+
+    act(() => {
+      useMapStore.getState().styleLoaded(STYLE_A, {})
+    })
+    act(() => {
+      useMapStore.getState().styleLoaded(STYLE_A, {})
+    })
+
+    expect(map.setStyle).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('basemap selection', () => {
+  it('lists the OpenFreeMap styles with Liberty selected by default', () => {
+    render(<App />)
+    const select = screen.getByLabelText('Basemap style') as HTMLSelectElement
+    expect(select.value).toBe('https://tiles.openfreemap.org/styles/liberty')
+    const labels = Array.from(select.options).map((option) => option.textContent)
+    expect(labels).toEqual(['Liberty', 'Bright', 'Positron', 'Dark', 'Fiord'])
+  })
+
+  it('remounts MapCanvas for the chosen style and resets the store overrides', () => {
+    render(<App />)
+    const instancesBefore = mapInstances.length
+
+    const select = screen.getByLabelText('Basemap style') as HTMLSelectElement
+    act(() => {
+      select.value = 'https://tiles.openfreemap.org/styles/bright'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+
+    expect(useMapStore.getState().basemapUrl).toBe('https://tiles.openfreemap.org/styles/bright')
+    expect(useMapStore.getState().style).toBeNull()
+    expect(useMapStore.getState().layerMap).toEqual({})
+    expect(mapInstances.length).toBe(instancesBefore + 1)
+    expect(mapInstances[instancesBefore - 1].remove).toHaveBeenCalled()
   })
 })

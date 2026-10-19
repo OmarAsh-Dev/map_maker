@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import '@testing-library/jest-dom/vitest'
@@ -7,7 +7,7 @@ import ExportDialog from './ExportDialog'
 import { useExportStore } from '../stores/exportStore'
 import type { ExportMainProgress } from '../stores/exportStore'
 import { useMapStore } from '../stores/mapStore'
-import { planChunks } from '../lib/chunkPlan'
+import { planChunks, worldPxToLngLat } from '../lib/chunkPlan'
 import type { CropBounds } from '../lib/chunkPlan'
 import type { StyleSpecification } from 'maplibre-gl'
 
@@ -139,6 +139,31 @@ describe('ExportDialog', () => {
     )
   })
 
+  it('applies an aspect-ratio lock by re-centering the stored crop bounds', async () => {
+    const bounds: CropBounds = {
+      west: -18,
+      east: 18,
+      south: worldPxToLngLat(0, 512 * 0.55, 0).lat,
+      north: worldPxToLngLat(0, 512 * 0.45, 0).lat,
+    }
+    useExportStore.setState({ cropBounds: bounds })
+    const user = userEvent.setup()
+    render(<ExportDialog />)
+
+    await user.click(screen.getByRole('radio', { name: '16:9' }))
+
+    const state = useExportStore.getState()
+    expect(state.aspectRatio).toBe('16:9')
+    expect(state.cropBounds).not.toBe(bounds)
+    expect(state.cropBounds!.south).toBeCloseTo(bounds.south, 10)
+    expect(state.cropBounds!.north).toBeCloseTo(bounds.north, 10)
+    expect((state.cropBounds!.east - state.cropBounds!.west) / 360).toBeCloseTo(0.1 * (16 / 9), 9)
+    expect((state.cropBounds!.east + state.cropBounds!.west) / 2).toBeCloseTo(0, 9)
+
+    await user.click(screen.getByRole('radio', { name: 'Free' }))
+    expect(useExportStore.getState().aspectRatio).toBe('free')
+  })
+
   it('clicking Export streams the chunk flow through the export IPC', async () => {
     useExportStore.setState({ cropBounds: BOUNDS })
     const user = userEvent.setup()
@@ -192,5 +217,40 @@ describe('ExportDialog', () => {
 
     await waitFor(() => expect(useExportStore.getState().status).toBe('error'))
     expect(useExportStore.getState().message).toBe('Composite failed')
+  })
+
+  it('unwedges the dialog when main reports done before finishExport resolves', async () => {
+    let progressCb: ((p: ExportMainProgress) => void) | null = null
+    api.onExportProgress.mockImplementation((cb: (p: ExportMainProgress) => void) => {
+      progressCb = cb
+      return () => {}
+    })
+    let resolveFinish: (() => void) | null = null
+    api.finishExport.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveFinish = resolve
+        })
+    )
+    api.sendChunk.mockImplementation(() => {
+      progressCb?.({ stage: 'done', path: 'C:/out/map.png' })
+    })
+    useExportStore.setState({ cropBounds: BOUNDS })
+    const user = userEvent.setup()
+    render(<ExportDialog />)
+
+    await user.click(screen.getByRole('button', { name: 'Export' }))
+
+    await waitFor(() => expect(useExportStore.getState().status).toBe('done'))
+    expect(useExportStore.getState().outputPath).toBe('C:/out/map.png')
+    expect(useExportStore.getState().exporting).toBe(false)
+    expect(screen.getByRole('button', { name: 'Close' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Export' })).toBeInTheDocument()
+
+    await act(async () => {
+      resolveFinish?.()
+    })
+    await waitFor(() => expect(useExportStore.getState().exporting).toBe(false))
+    expect(useExportStore.getState().status).toBe('done')
   })
 })

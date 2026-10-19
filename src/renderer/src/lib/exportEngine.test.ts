@@ -1,12 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Mock } from 'vitest'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { StyleSpecification } from 'maplibre-gl'
+import { readPsd } from 'ag-psd'
+import sharp from 'sharp'
 import { planChunks } from './chunkPlan'
 import type { Chunk, ChunkPlan, CropBounds } from './chunkPlan'
 import type { LayerMap } from './styleMap'
 import type { PassKind } from './maskPasses'
 import { runExport } from './exportEngine'
 import type { ExportChunkImage, ExportRenderer } from './exportEngine'
+import { ExportSession } from '../../../main/export/exportSession'
+import type { ExportJobSpec } from '../../../main/export/exportSession'
 
 const fakeApi = {
   beginExport: vi.fn(),
@@ -37,7 +44,7 @@ const STYLE = {
 
 const LAYER_MAP: LayerMap = {
   water: { fill: ['water-fill'], casing: [], labels: ['water-label'] },
-  'road.highway': { fill: ['road-highway'], casing: [], labels: ['road-highway-label'] },
+  road: { fill: ['road-highway'], casing: [], labels: ['road-highway-label'] },
 }
 
 const BASE_BOUNDS: CropBounds = { west: 0, south: 0, east: 1, north: 1 }
@@ -123,8 +130,8 @@ describe('runExport', () => {
     const expected = [
       ...chunkOrder.map((c) => `geometry:water@${c}`),
       ...chunkOrder.map((c) => `labels:water@${c}`),
-      ...chunkOrder.map((c) => `geometry:road.highway@${c}`),
-      ...chunkOrder.map((c) => `labels:road.highway@${c}`),
+      ...chunkOrder.map((c) => `geometry:road@${c}`),
+      ...chunkOrder.map((c) => `labels:road@${c}`),
     ]
     expect(
       calls.map(
@@ -140,16 +147,18 @@ describe('runExport', () => {
 
     expect(fakeApi.sendChunk.mock.calls.map((call) => call[0])).toEqual([
       ...chunkOrder.map(() => 'Water'),
-      ...chunkOrder.map(() => 'Water'),
-      ...chunkOrder.map(() => 'Highway'),
-      ...chunkOrder.map(() => 'Highway'),
+      ...chunkOrder.map(() => 'Water labels'),
+      ...chunkOrder.map(() => 'Road'),
+      ...chunkOrder.map(() => 'Road labels'),
     ])
     expect(fakeApi.beginExport.mock.calls[0][0]).toMatchObject({
       mode: 'layered',
       container: 'psd',
       groups: [
         { id: 'water', label: 'Water' },
-        { id: 'road.highway', label: 'Highway' },
+        { id: 'water', label: 'Water labels' },
+        { id: 'road', label: 'Road' },
+        { id: 'road', label: 'Road labels' },
       ],
     })
     expect(fakeApi.finishExport).toHaveBeenCalledTimes(1)
@@ -241,5 +250,94 @@ describe('runExport', () => {
 
     await runExport(baseOpts({ renderer, attribution: false }))
     expect(fakeApi.beginExport.mock.calls[1][0]).toMatchObject({ attribution: null })
+  })
+
+  it('streams the real pass sequence through a real ExportSession into a complete layered PSD', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'map-maker-engine-'))
+    try {
+      const outPath = join(dir, 'map.psd')
+      const colors: Record<string, [number, number, number]> = {
+        'geometry:water': [10, 30, 200],
+        'labels:water': [220, 40, 50],
+        'geometry:road': [15, 170, 70],
+        'labels:road': [250, 205, 30],
+      }
+      let session: ExportSession | null = null
+      const routedApi = {
+        beginExport: (spec: ExportJobSpec) => {
+          session = new ExportSession(spec, () => {})
+        },
+        sendChunk: (label: string, col: number, row: number, png: ArrayBuffer) => {
+          void session?.addChunk(label, { col, row, png: Buffer.from(png) })
+        },
+        finishExport: async () => {
+          if (!session) throw new Error('no active session')
+          await session.finish()
+        },
+        cancelExport: () => session?.cancel(),
+      }
+      vi.stubGlobal('window', { api: routedApi })
+
+      const renderer: ExportRenderer = {
+        ensureStyle: async () => {},
+        renderChunk: async (plan, chunk, pass) => {
+          const key = `${pass.type}:${'groupId' in pass ? pass.groupId : ''}`
+          const [r, g, b] = colors[key]
+          const png = await sharp({
+            create: {
+              width: plan.chunkPx,
+              height: plan.chunkPx,
+              channels: 4,
+              background: { r, g, b, alpha: 1 },
+            },
+            limitInputPixels: false,
+          })
+            .png()
+            .toBuffer()
+          return {
+            col: chunk.col,
+            row: chunk.row,
+            png: png.buffer.slice(png.byteOffset, png.byteOffset + png.byteLength) as ArrayBuffer,
+          }
+        },
+        destroy: () => {},
+      }
+
+      await runExport(
+        baseOpts({
+          renderer,
+          mode: 'layered',
+          container: 'psd',
+          longEdgePx: 256,
+          outPath,
+          attribution: false,
+        })
+      )
+
+      const psd = readPsd(await readFile(outPath), { useImageData: true })
+      expect(psd.children!.map((child) => child.name)).toEqual([
+        'Road labels',
+        'Road',
+        'Water labels',
+        'Water',
+      ])
+      for (const child of psd.children!) {
+        expect(child.imageData).toBeDefined()
+        expect(child.imageData!.data.length).toBeGreaterThan(0)
+      }
+      const pixelOf = (name: string): [number, number, number] => {
+        const child = psd.children!.find((entry) => entry.name === name)!
+        const data = child.imageData!.data as Uint8Array
+        const i = (Math.floor(child.imageData!.height / 2) * child.imageData!.width +
+          Math.floor(child.imageData!.width / 2)) * 4
+        return [data[i], data[i + 1], data[i + 2]]
+      }
+      expect(pixelOf('Water')).toEqual([10, 30, 200])
+      expect(pixelOf('Water labels')).toEqual([220, 40, 50])
+      expect(pixelOf('Road')).toEqual([15, 170, 70])
+      expect(pixelOf('Road labels')).toEqual([250, 205, 30])
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })

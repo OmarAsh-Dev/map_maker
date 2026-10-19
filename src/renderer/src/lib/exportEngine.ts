@@ -34,18 +34,28 @@ export interface EnginePass {
 
 export function computePasses(
   mode: 'flat' | 'layered',
-  layerMap: LayerMap,
-  style: StyleSpecification
+  groups: { id: string; label: string }[]
 ): EnginePass[] {
   if (mode === 'flat') {
     return [{ pass: { type: 'flat' }, groupLabel: FLAT_GROUP }]
   }
   const passes: EnginePass[] = []
-  for (const group of exportGroups(layerMap, style)) {
+  for (const group of groups) {
     passes.push({ pass: { type: 'geometry', groupId: group.id }, groupLabel: group.label })
-    passes.push({ pass: { type: 'labels', groupId: group.id }, groupLabel: group.label })
+    passes.push({ pass: { type: 'labels', groupId: group.id }, groupLabel: `${group.label} labels` })
   }
   return passes
+}
+
+export function flattenGroupsForExport(
+  groups: { id: string; label: string }[]
+): { id: string; label: string }[] {
+  const entries: { id: string; label: string }[] = []
+  for (const group of groups) {
+    entries.push({ id: group.id, label: group.label })
+    entries.push({ id: group.id, label: `${group.label} labels` })
+  }
+  return entries
 }
 
 export interface RunExportOptions {
@@ -64,7 +74,8 @@ export interface RunExportOptions {
 
 export async function runExport(opts: RunExportOptions): Promise<void> {
   const plan = planChunks(opts.bounds, opts.longEdgePx)
-  const passes = computePasses(opts.mode, opts.layerMap, opts.style)
+  const groups = opts.mode === 'flat' ? [] : exportGroups(opts.layerMap, opts.style)
+  const passes = computePasses(opts.mode, groups)
   if (opts.signal.aborted) {
     throw new Error('Export cancelled')
   }
@@ -79,7 +90,7 @@ export async function runExport(opts: RunExportOptions): Promise<void> {
     actualHeight: plan.actualHeight,
     outWidth: plan.actualWidth,
     outHeight: plan.actualHeight,
-    groups: opts.mode === 'flat' ? [] : exportGroups(opts.layerMap, opts.style),
+    groups: flattenGroupsForExport(groups),
     outPath: opts.outPath,
     attribution: opts.attribution ? ATTRIBUTION_TEXT : null,
   })

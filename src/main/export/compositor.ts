@@ -6,6 +6,11 @@ export interface CompositorChunk {
   png: Buffer
 }
 
+function pasteOffset(start: number, region: number, chunkPx: number): number {
+  const visible = Math.min(chunkPx, region - start)
+  return Math.round(start + visible / 2 - chunkPx / 2)
+}
+
 export async function compositeChunks(
   chunks: CompositorChunk[],
   cols: number,
@@ -14,8 +19,13 @@ export async function compositeChunks(
   outWidth: number,
   outHeight: number
 ): Promise<Buffer> {
-  const gridWidth = Math.ceil(cols * chunkPx)
-  const gridHeight = Math.ceil(rows * chunkPx)
+  const gridWidth = cols * chunkPx
+  const gridHeight = rows * chunkPx
+  if (outWidth > gridWidth || outHeight > gridHeight) {
+    throw new Error(
+      `compositeChunks: requested ${outWidth}x${outHeight} exceeds the ${gridWidth}x${gridHeight} chunk grid`
+    )
+  }
 
   const base = sharp({
     create: { width: gridWidth, height: gridHeight, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
@@ -25,8 +35,8 @@ export async function compositeChunks(
     ? base.composite(
         chunks.map((chunk) => ({
           input: chunk.png,
-          left: chunk.col * chunkPx,
-          top: chunk.row * chunkPx,
+          left: pasteOffset(chunk.col * chunkPx, outWidth, chunkPx),
+          top: pasteOffset(chunk.row * chunkPx, outHeight, chunkPx),
           limitInputPixels: false,
         }))
       )
@@ -35,37 +45,12 @@ export async function compositeChunks(
     .png()
     .toBuffer()
 
-  const cropWidth = Math.min(outWidth, gridWidth)
-  const cropHeight = Math.min(outHeight, gridHeight)
-  const cropped =
-    cropWidth === gridWidth && cropHeight === gridHeight
-      ? composited
-      : await sharp(composited, { limitInputPixels: false })
-          .extract({
-            left: Math.floor((gridWidth - cropWidth) / 2),
-            top: Math.floor((gridHeight - cropHeight) / 2),
-            width: cropWidth,
-            height: cropHeight,
-          })
-          .png()
-          .toBuffer()
-
-  if (cropWidth === outWidth && cropHeight === outHeight) {
-    return cropped
+  if (outWidth === gridWidth && outHeight === gridHeight) {
+    return composited
   }
 
-  return sharp({
-    create: { width: outWidth, height: outHeight, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
-    limitInputPixels: false,
-  })
-    .composite([
-      {
-        input: cropped,
-        left: Math.floor((outWidth - cropWidth) / 2),
-        top: Math.floor((outHeight - cropHeight) / 2),
-        limitInputPixels: false,
-      },
-    ])
+  return sharp(composited, { limitInputPixels: false })
+    .extract({ left: 0, top: 0, width: outWidth, height: outHeight })
     .png()
     .toBuffer()
 }

@@ -11,15 +11,28 @@ const ROAD_TRIGGERS = ['road', 'bridge', 'tunnel', 'highway']
 const ROAD_SUBS: Array<{ id: string; words: string[] }> = [
   { id: 'road.highway', words: ['motorway', 'trunk', 'link'] },
   { id: 'road.arterial', words: ['primary', 'secondary', 'tertiary', 'arterial'] },
+  { id: 'road.street-limits', words: ['street_limit', 'street-limits', 'street_limiter'] },
   { id: 'road.minor', words: ['minor', 'street', 'residential', 'unclassified', 'living'] },
   { id: 'road.service', words: ['service'] },
   { id: 'road.path', words: ['path', 'pedestrian', 'footway', 'cycleway', 'steps', 'trail', 'piste'] },
   { id: 'road.highway', words: ['highway'] },
 ]
 
-const POI_TRIGGERS = ['poi', 'amenity', 'shop', 'landmark', 'attraction', 'monument', 'office', 'station']
+const POI_TRIGGERS = [
+  'poi',
+  'amenity',
+  'shop',
+  'retail',
+  'landmark',
+  'attraction',
+  'monument',
+  'historic',
+  'tourism',
+  'office',
+  'station',
+]
 
-const TRANSIT_TRIGGERS = ['rail', 'transit', 'aeroway', 'airport', 'ferry', 'aerialway']
+const TRANSIT_TRIGGERS = ['rail', 'transit', 'aeroway', 'airport', 'ferry', 'aerialway', 'bus', 'cablecar']
 
 const ADMIN_TRIGGERS = ['boundary', 'label_country', 'label_state', 'label_city', 'label_town', 'label_village', 'admin']
 
@@ -45,14 +58,22 @@ function roadSubId(id: string): string {
 
 function poiSubId(id: string): string {
   if (id.includes('transport') || id.includes('transit') || id.includes('station')) return 'poi.transport'
-  if (id.includes('shop')) return 'poi.shop'
-  if (id.includes('landmark') || id.includes('attraction') || id.includes('monument')) return 'poi.landmark'
+  if (id.includes('shop') || id.includes('retail')) return 'poi.shop'
+  if (
+    id.includes('landmark') ||
+    id.includes('attraction') ||
+    id.includes('monument') ||
+    id.includes('historic') ||
+    id.includes('tourism')
+  ) {
+    return 'poi.landmark'
+  }
   return 'poi.amenity'
 }
 
 function transitSubId(id: string): string {
   if (id.includes('ferry')) return 'transit.ferry'
-  if (id.includes('aerialway')) return 'transit.aerialway'
+  if (id.includes('aerialway') || id.includes('cablecar')) return 'transit.aerialway'
   if (id.includes('bus')) return 'transit.bus'
   return 'transit.rail'
 }
@@ -77,6 +98,7 @@ function categoriesForLayer(id: string): string[] {
   if (id.includes('background')) return ['background']
   if (id.includes('water')) return ['water']
   if (id.includes('building')) return ['buildings']
+  if (id.includes('label_other')) return ['administrative.settlement', 'administrative']
   if (POI_TRIGGERS.some((word) => id.includes(word))) return [poiSubId(id), 'poi']
   if (TRANSIT_TRIGGERS.some((word) => id.includes(word))) return [transitSubId(id), 'transit']
   if (ROAD_TRIGGERS.some((word) => id.includes(word))) return [roadSubId(id), 'road']

@@ -7,14 +7,24 @@ import PresetsBar from './components/PresetsBar'
 import CategoryDetailPanel from './components/sidebar/CategoryDetailPanel'
 import FeatureTree from './components/sidebar/FeatureTree'
 import { buildLayerMapFromStyle } from './lib/layerMapBuilder'
+import type { LayerMap } from './lib/styleMap'
 import { useExportStore } from './stores/exportStore'
 import { useMapStore } from './stores/mapStore'
 
-const OPENFREEMAP_LIBERTY = 'https://tiles.openfreemap.org/styles/liberty'
+const EMPTY_LAYER_MAP: LayerMap = {}
+
+export const BASEMAP_STYLES: { label: string; url: string }[] = [
+  { label: 'Liberty', url: 'https://tiles.openfreemap.org/styles/liberty' },
+  { label: 'Bright', url: 'https://tiles.openfreemap.org/styles/bright' },
+  { label: 'Positron', url: 'https://tiles.openfreemap.org/styles/positron' },
+  { label: 'Dark', url: 'https://tiles.openfreemap.org/styles/dark' },
+  { label: 'Fiord', url: 'https://tiles.openfreemap.org/styles/fiord' },
+]
 
 function App() {
   const mapRef = useRef<MaplibreMap | null>(null)
   const selectedCategoryId = useMapStore((state) => state.selectedCategoryId)
+  const basemapUrl = useMapStore((state) => state.basemapUrl)
   const cropMode = useExportStore((state) => state.cropMode)
 
   const handleMapReady = useCallback((map: MaplibreMap) => {
@@ -28,12 +38,35 @@ function App() {
   return (
     <main className="flex h-screen w-screen overflow-hidden bg-slate-950">
       <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-r border-gray-200 bg-white">
+        <div className="border-b border-gray-200 p-3">
+          <label
+            htmlFor="basemap-select"
+            className="block text-xs font-medium uppercase tracking-wide text-gray-500"
+          >
+            Basemap
+          </label>
+          <select
+            id="basemap-select"
+            aria-label="Basemap style"
+            value={basemapUrl}
+            onChange={(event) =>
+              useMapStore.getState().setBasemap(event.target.value, EMPTY_LAYER_MAP)
+            }
+            className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
+          >
+            {BASEMAP_STYLES.map((style) => (
+              <option key={style.url} value={style.url}>
+                {style.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <PresetsBar />
         <FeatureTree />
         {selectedCategoryId !== null && <CategoryDetailPanel />}
       </aside>
       <div className="relative min-w-0 flex-1">
-        <MapCanvas styleUrl={OPENFREEMAP_LIBERTY} onMapReady={handleMapReady} />
+        <MapCanvas key={basemapUrl} styleUrl={basemapUrl} onMapReady={handleMapReady} />
         <h1 className="pointer-events-none absolute left-4 top-4 z-10 text-4xl font-bold text-slate-50">
           map_maker
         </h1>

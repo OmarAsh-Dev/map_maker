@@ -6,6 +6,7 @@ import { applyPassMask } from './maskPasses'
 import type { PassKind } from './maskPasses'
 import type { Chunk, ChunkPlan } from './chunkPlan'
 import type { LayerMap } from './styleMap'
+import { applyRequestCaps } from './mapOptions'
 import { dataUrlToArrayBuffer } from './pngDataUrl'
 
 setWorkerUrl(maplibreWorkerUrl)
@@ -86,6 +87,7 @@ export class ChunkRenderer {
       preserveDrawingBuffer: true,
       canvasContextAttributes: { preserveDrawingBuffer: true }
     }
+    applyRequestCaps()
 
     let map: MaplibreMap
     try {

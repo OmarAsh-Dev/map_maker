@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { MAX_EXPORT_PX, planChunks } from '../lib/chunkPlan'
 import { runExport } from '../lib/exportEngine'
-import { effectiveLongEdge, SIZE_PRESETS, useExportStore } from '../stores/exportStore'
+import {
+  ASPECT_RATIO_PRESETS,
+  effectiveLongEdge,
+  SIZE_PRESETS,
+  useExportStore,
+} from '../stores/exportStore'
 import { useMapStore } from '../stores/mapStore'
 
 function progressPercent(
@@ -55,6 +60,7 @@ export default function ExportDialog() {
   const container = useExportStore((state) => state.container)
   const sizePreset = useExportStore((state) => state.sizePreset)
   const customLongEdge = useExportStore((state) => state.customLongEdge)
+  const aspectRatio = useExportStore((state) => state.aspectRatio)
   const attribution = useExportStore((state) => state.attribution)
   const cropBounds = useExportStore((state) => state.cropBounds)
   const exporting = useExportStore((state) => state.exporting)
@@ -130,9 +136,7 @@ export default function ExportDialog() {
         signal: controller.signal,
       })
       const after = useExportStore.getState()
-      if (after.status !== 'done' && after.status !== 'error') {
-        after.endExport('done')
-      }
+      after.endExport('done')
     } catch (err) {
       const after = useExportStore.getState()
       if (controller.signal.aborted) {
@@ -235,6 +239,25 @@ export default function ExportDialog() {
               className="w-24 rounded border border-gray-300 px-2 py-1 text-sm"
             />
             <span className="text-xs text-gray-500">px, max {MAX_EXPORT_PX}</span>
+          </div>
+        </fieldset>
+
+        <fieldset className="mt-3" aria-label="Aspect ratio">
+          <legend className="text-xs font-medium uppercase tracking-wide text-gray-500">
+            Aspect ratio
+          </legend>
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-2">
+            {ASPECT_RATIO_PRESETS.map((preset) => (
+              <label key={preset.id} className="flex items-center gap-1.5 text-sm text-gray-800">
+                <input
+                  type="radio"
+                  name="export-ratio"
+                  checked={aspectRatio === preset.id}
+                  onChange={() => useExportStore.getState().setAspectRatio(preset.id)}
+                />
+                {preset.label}
+              </label>
+            ))}
           </div>
         </fieldset>
 

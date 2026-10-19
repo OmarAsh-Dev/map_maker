@@ -1,11 +1,23 @@
 import type { Map as MaplibreMap } from 'maplibre-gl'
 import { create } from 'zustand'
-import { MAX_EXPORT_PX } from '../lib/chunkPlan'
+import { MAX_EXPORT_PX, adjustBoundsToRatio } from '../lib/chunkPlan'
 import type { CropBounds } from '../lib/chunkPlan'
 
 export type ExportMode = 'flat' | 'layered'
 export type ExportContainer = 'psd' | 'png-folder'
 export type SizePresetId = '1080p' | '4K' | '8K' | '16K' | 'custom'
+export type AspectRatioId = 'free' | '16:9' | '9:16' | '1:1'
+
+export const ASPECT_RATIO_PRESETS: {
+  id: AspectRatioId
+  label: string
+  ratio: number | null
+}[] = [
+  { id: 'free', label: 'Free', ratio: null },
+  { id: '16:9', label: '16:9', ratio: 16 / 9 },
+  { id: '9:16', label: '9:16', ratio: 9 / 16 },
+  { id: '1:1', label: '1:1', ratio: 1 },
+]
 
 export const SIZE_PRESETS: { id: Exclude<SizePresetId, 'custom'>; label: string; longEdge: number }[] = [
   { id: '1080p', label: '1080p', longEdge: 1920 },
@@ -50,6 +62,7 @@ export interface ExportState {
   container: ExportContainer
   sizePreset: SizePresetId
   customLongEdge: number
+  aspectRatio: AspectRatioId
   attribution: boolean
   exporting: boolean
   status: ExportStatus
@@ -68,6 +81,7 @@ export interface ExportState {
   setContainer(container: ExportContainer): void
   setSizePreset(preset: SizePresetId): void
   setCustomLongEdge(px: number): void
+  setAspectRatio(ratio: AspectRatioId): void
   setAttribution(value: boolean): void
   beginExportState(): AbortController
   setRenderProgress(done: number, total: number): void
@@ -75,7 +89,7 @@ export interface ExportState {
   endExport(status: ExportStatus, message?: string | null): void
 }
 
-export const useExportStore = create<ExportState>()((set) => ({
+export const useExportStore = create<ExportState>()((set, get) => ({
   mapInstance: null,
   cropMode: false,
   cropBounds: null,
@@ -84,6 +98,7 @@ export const useExportStore = create<ExportState>()((set) => ({
   container: 'psd',
   sizePreset: '4K',
   customLongEdge: 3840,
+  aspectRatio: 'free',
   attribution: true,
   exporting: false,
   status: 'idle',
@@ -102,6 +117,18 @@ export const useExportStore = create<ExportState>()((set) => ({
   setContainer: (container) => set({ container }),
   setSizePreset: (preset) => set({ sizePreset: preset }),
   setCustomLongEdge: (px) => set({ customLongEdge: clampLongEdge(px), sizePreset: 'custom' }),
+  setAspectRatio: (ratio) => {
+    const preset = ASPECT_RATIO_PRESETS.find((entry) => entry.id === ratio)
+    const state = get()
+    if (!preset || preset.ratio === null || !state.cropBounds) {
+      set({ aspectRatio: ratio })
+      return
+    }
+    set({
+      aspectRatio: ratio,
+      cropBounds: adjustBoundsToRatio(state.cropBounds, preset.ratio),
+    })
+  },
   setAttribution: (value) => set({ attribution: value }),
   beginExportState: () => {
     const controller = new AbortController()
@@ -129,7 +156,7 @@ export const useExportStore = create<ExportState>()((set) => ({
       return
     }
     if (progress.stage === 'done') {
-      set({ status: 'done', outputPath: progress.path })
+      set({ status: 'done', outputPath: progress.path, exporting: false })
       return
     }
     set({ status: 'error', message: progress.message })

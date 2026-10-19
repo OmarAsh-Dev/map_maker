@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Map as MaplibreMap, setWorkerUrl } from 'maplibre-gl'
+import type { StyleSpecification } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { createMapOptions } from '../lib/mapOptions'
@@ -17,6 +18,7 @@ export default function MapCanvas({ styleUrl, onMapReady }: MapCanvasProps) {
   const mapRef = useRef<MaplibreMap | null>(null)
   const onMapReadyRef = useRef(onMapReady)
   onMapReadyRef.current = onMapReady
+  const appliedStyleRef = useRef<StyleSpecification | null>(null)
   const style = useMapStore((state) => state.style)
 
   useEffect(() => {
@@ -37,9 +39,10 @@ export default function MapCanvas({ styleUrl, onMapReady }: MapCanvasProps) {
 
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !style) {
+    if (!map || !style || appliedStyleRef.current === style) {
       return
     }
+    appliedStyleRef.current = style
     map.setStyle(style)
   }, [style])
 

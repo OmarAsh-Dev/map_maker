@@ -1,5 +1,6 @@
 import { dialog, ipcMain } from 'electron'
 import { ExportSession, type ExportJobSpec } from './export/exportSession'
+import { validateExportSpec } from './export/validateSpec'
 
 let activeSession: ExportSession | null = null
 
@@ -7,6 +8,7 @@ export type ExportPathKind = 'psd' | 'png-folder' | 'png'
 
 export function registerExportIpc(): void {
   ipcMain.handle('export:begin', (event, spec: ExportJobSpec) => {
+    validateExportSpec(spec)
     activeSession?.cancel()
     activeSession = new ExportSession(spec, (p) => {
       if (!event.sender.isDestroyed()) {
@@ -20,9 +22,23 @@ export function registerExportIpc(): void {
     (_event, groupLabel: string, col: number, row: number, png: ArrayBuffer) => {
       const session = activeSession
       if (!session) return
-      void session
-        .addChunk(groupLabel, { col, row, png: Buffer.from(png) })
-        .catch(() => {})
+      if (
+        typeof groupLabel !== 'string' ||
+        !Number.isInteger(col) ||
+        !Number.isInteger(row) ||
+        col < 0 ||
+        row < 0
+      ) {
+        return
+      }
+      try {
+        const buffer = Buffer.from(png)
+        void session
+          .addChunk(groupLabel, { col, row, png: buffer })
+          .catch(() => {})
+      } catch {
+        return
+      }
     }
   )
 

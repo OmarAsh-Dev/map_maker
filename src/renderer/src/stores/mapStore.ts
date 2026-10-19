@@ -29,5 +29,6 @@ export const useMapStore: UseBoundStore<StoreApi<MapStore>> = create<MapStore>()
     if (!style) return
     set({ style: applyCategoryPatch(style, layerMap, categoryId, patch) })
   },
-  setBasemap: (url, layerMap) => set({ basemapUrl: url, layerMap, style: null }),
+  setBasemap: (url, layerMap) =>
+    set({ basemapUrl: url, layerMap, style: null, selectedCategoryId: null }),
 }))
