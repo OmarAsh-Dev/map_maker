@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
+import { registerExportIpc } from './ipc'
 import { PresetStore } from './presets'
 
 function registerIpcHandlers(): void {
@@ -11,6 +12,8 @@ function registerIpcHandlers(): void {
   ipcMain.handle('presets:list', () => presets.list())
   ipcMain.handle('presets:load', (_event, name: string) => presets.load(name))
   ipcMain.handle('presets:delete', (_event, name: string) => presets.remove(name))
+
+  registerExportIpc()
 }
 
 function createWindow(): void {
