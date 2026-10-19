@@ -143,6 +143,26 @@ describe('buildLayerMapFromStyle', () => {
     expect(hasEntry(layerMap, 'poi.transport', 'labels', 'poi_transit')).toBe(true)
   })
 
+  it('assigns raster backdrop layers to background for visibility control', () => {
+    const style = {
+      version: 8,
+      sources: {},
+      layers: [{ id: 'natural_earth', type: 'raster', paint: {} }],
+    } as unknown as StyleSpecification
+    const layerMap = buildLayerMapFromStyle(style)
+    expect(hasEntry(layerMap, 'background', 'fill', 'natural_earth')).toBe(true)
+  })
+
+  it('assigns fill-extrusion layers to buildings', () => {
+    const style = {
+      version: 8,
+      sources: {},
+      layers: [{ id: 'building-3d', type: 'fill-extrusion', paint: {} }],
+    } as unknown as StyleSpecification
+    const layerMap = buildLayerMapFromStyle(style)
+    expect(hasEntry(layerMap, 'buildings', 'fill', 'building-3d')).toBe(true)
+  })
+
   it('routes retail, historic and tourism ids to poi.shop and poi.landmark', () => {
     const style = {
       version: 8,
@@ -217,8 +237,9 @@ describe('buildLayerMapFromStyle', () => {
     }
   })
 
-  it('keeps raster layers out of every category', () => {
+  it('routes raster backdrop layers to background (visibility only, no paint props)', () => {
     const layerMap = buildLayerMapFromStyle(FIXTURE_STYLE)
-    expect(allLayerIds(layerMap)).not.toContain('natural_earth')
+    expect(hasEntry(layerMap, 'background', 'fill', 'natural_earth')).toBe(true)
+    expect(allLayerIds(layerMap).filter((entry) => entry === 'natural_earth')).toHaveLength(1)
   })
 })

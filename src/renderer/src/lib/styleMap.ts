@@ -69,6 +69,7 @@ function resolveLayers(layers: LooseLayer[], ids: string[]): LooseLayer[] {
 function geometryFillProp(layer: LooseLayer): string | null {
   if (layer.type === 'background') return 'background-color'
   if (layer.type === 'fill') return 'fill-color'
+  if (layer.type === 'fill-extrusion') return 'fill-extrusion-color'
   if (layer.type === 'line') return 'line-color'
   return null
 }
@@ -82,6 +83,7 @@ function geometryStrokeProp(layer: LooseLayer): string | null {
 function geometryOpacityProp(layer: LooseLayer): string | null {
   if (layer.type === 'background') return 'background-opacity'
   if (layer.type === 'fill') return 'fill-opacity'
+  if (layer.type === 'fill-extrusion') return 'fill-extrusion-opacity'
   if (layer.type === 'line') return 'line-opacity'
   return null
 }

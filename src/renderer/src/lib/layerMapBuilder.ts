@@ -4,7 +4,7 @@ import type { CategoryLayers, LayerMap } from './styleMap'
 
 type Slot = keyof CategoryLayers
 
-const GEOMETRY_TYPES = new Set(['fill', 'line', 'fill-extrusion', 'background'])
+const GEOMETRY_TYPES = new Set(['fill', 'line', 'fill-extrusion', 'background', 'raster'])
 
 const ROAD_TRIGGERS = ['road', 'bridge', 'tunnel', 'highway']
 
@@ -120,7 +120,8 @@ export function buildLayerMapFromStyle(style: StyleSpecification): LayerMap {
     const id = layer.id.toLowerCase()
     const slot = slotFor(layer.type ?? '', id)
     if (!slot) continue
-    for (const categoryId of categoriesForLayer(id)) {
+    const categories = layer.type === 'raster' ? ['background'] : categoriesForLayer(id)
+    for (const categoryId of categories) {
       layerMap[categoryId]?.[slot].push(layer.id)
     }
   }

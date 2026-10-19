@@ -57,6 +57,30 @@ describe('background layer type mapping', () => {
     expect(readCategory(bgStyle, bgMap, 'background').geometryFill).toBe('#f8f4f0')
   })
 
+  it('writes geometry fill as fill-extrusion-color on fill-extrusion layers', () => {
+    const extrusionStyle = {
+      version: 8,
+      sources: {},
+      layers: [
+        {
+          id: 'building-3d',
+          type: 'fill-extrusion',
+          paint: { 'fill-extrusion-color': '#eeeeee' },
+        },
+      ],
+    } as unknown as StyleSpecification
+    const extrusionMap: LayerMap = { buildings: { fill: ['building-3d'], casing: [], labels: [] } }
+    const style = applyCategoryPatch(extrusionStyle, extrusionMap, 'buildings', {
+      geometryFill: '#223344',
+    })
+    expect(paintOf(style, 'building-3d')['fill-extrusion-color']).toBe('#223344')
+    const opacity = applyCategoryPatch(extrusionStyle, extrusionMap, 'buildings', {
+      geometryOpacity: 0.8,
+    })
+    expect(paintOf(opacity, 'building-3d')['fill-extrusion-opacity']).toBe(0.8)
+    expect(readCategory(style, extrusionMap, 'buildings').geometryFill).toBe('#223344')
+  })
+
   it('pins current read behavior: absent background-opacity reports mixed (T3 deferred default)', () => {
     expect(readCategory(bgStyle, bgMap, 'background').geometryOpacity).toBe('mixed')
   })
