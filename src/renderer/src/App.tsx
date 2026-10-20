@@ -10,6 +10,7 @@ import { buildLayerMapFromStyle } from './lib/layerMapBuilder'
 import type { LayerMap } from './lib/styleMap'
 import { useExportStore } from './stores/exportStore'
 import { useMapStore } from './stores/mapStore'
+import LabelsToggle from './components/sidebar/LabelsToggle'
 
 const EMPTY_LAYER_MAP: LayerMap = {}
 
@@ -62,6 +63,7 @@ function App() {
           </select>
         </div>
         <PresetsBar />
+        <LabelsToggle />
         <FeatureTree />
         {selectedCategoryId !== null && <CategoryDetailPanel />}
       </aside>

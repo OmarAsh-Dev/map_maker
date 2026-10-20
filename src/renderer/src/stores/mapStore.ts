@@ -3,6 +3,7 @@ import { create } from 'zustand'
 import type { StoreApi, UseBoundStore } from 'zustand'
 import { applyCategoryPatch } from '../lib/styleMap'
 import type { CategoryPatch, LayerMap } from '../lib/styleMap'
+import { CATEGORY_GROUPS } from '../lib/categories'
 
 export const DEFAULT_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty'
 
@@ -11,10 +12,16 @@ export interface MapStore {
   layerMap: LayerMap
   basemapUrl: string
   selectedCategoryId: string | null
+  labelsHidden: boolean
   styleLoaded(style: StyleSpecification, layerMap: LayerMap): void
   selectCategory(id: string | null): void
   patchCategory(categoryId: string, patch: CategoryPatch): void
   setBasemap(url: string, layerMap: LayerMap): void
+  setLabelsHidden(hidden: boolean): void
+}
+
+function allCategoryIds(): string[] {
+  return CATEGORY_GROUPS.flatMap((group) => [group.id, ...group.children.map((c) => c.id)])
 }
 
 export const useMapStore: UseBoundStore<StoreApi<MapStore>> = create<MapStore>()((set, get) => ({
@@ -22,7 +29,8 @@ export const useMapStore: UseBoundStore<StoreApi<MapStore>> = create<MapStore>()
   layerMap: {},
   basemapUrl: DEFAULT_STYLE_URL,
   selectedCategoryId: null,
-  styleLoaded: (style, layerMap) => set({ style, layerMap }),
+  labelsHidden: false,
+  styleLoaded: (style, layerMap) => set({ style, layerMap, labelsHidden: false }),
   selectCategory: (id) => set({ selectedCategoryId: id }),
   patchCategory: (categoryId, patch) => {
     const { style, layerMap } = get()
@@ -30,5 +38,17 @@ export const useMapStore: UseBoundStore<StoreApi<MapStore>> = create<MapStore>()
     set({ style: applyCategoryPatch(style, layerMap, categoryId, patch) })
   },
   setBasemap: (url, layerMap) =>
-    set({ basemapUrl: url, layerMap, style: null, selectedCategoryId: null }),
+    set({ basemapUrl: url, layerMap, style: null, selectedCategoryId: null, labelsHidden: false }),
+  setLabelsHidden: (hidden) => {
+    const { style, layerMap } = get()
+    if (!style) {
+      set({ labelsHidden: hidden })
+      return
+    }
+    let next = style
+    for (const id of allCategoryIds()) {
+      next = applyCategoryPatch(next, layerMap, id, { labelVisible: !hidden })
+    }
+    set({ style: next, labelsHidden: hidden })
+  },
 }))
