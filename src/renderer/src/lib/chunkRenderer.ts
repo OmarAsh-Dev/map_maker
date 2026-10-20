@@ -23,20 +23,41 @@ export interface ChunkRendererOptions {
 
 const LOAD_TIMEOUT_MS = 60_000
 
-function cloneStyle(style: StyleSpecification): StyleSpecification {
-  return JSON.parse(JSON.stringify(style)) as StyleSpecification
+export function waitForMapEvent(
+  map: { once(event: 'load' | 'idle', cb: () => void): unknown; off(event: 'load' | 'idle', cb: () => void): unknown },
+  event: 'load' | 'idle',
+  signal?: AbortSignal,
+  timeoutMs = LOAD_TIMEOUT_MS
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error('Export cancelled'))
+      return
+    }
+    const cleanup = () => {
+      clearTimeout(timer)
+      map.off(event, onEvent)
+      signal?.removeEventListener('abort', onAbort)
+    }
+    const onEvent = () => {
+      cleanup()
+      resolve()
+    }
+    const onAbort = () => {
+      cleanup()
+      reject(new Error('Export cancelled'))
+    }
+    const timer = setTimeout(() => {
+      cleanup()
+      reject(new Error(`ChunkRenderer: map did not fire '${event}' within ${timeoutMs}ms`))
+    }, timeoutMs)
+    map.once(event, onEvent)
+    signal?.addEventListener('abort', onAbort)
+  })
 }
 
-function onceMapEvent(map: MaplibreMap, event: 'load' | 'idle'): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(`ChunkRenderer: map did not fire '${event}' within ${LOAD_TIMEOUT_MS}ms`))
-    }, LOAD_TIMEOUT_MS)
-    map.once(event, () => {
-      clearTimeout(timer)
-      resolve()
-    })
-  })
+function cloneStyle(style: StyleSpecification): StyleSpecification {
+  return JSON.parse(JSON.stringify(style)) as StyleSpecification
 }
 
 export class ChunkRenderer {
@@ -49,14 +70,14 @@ export class ChunkRenderer {
     this.chunkPx = Math.max(1, Math.round(opts.chunkPx))
   }
 
-  async ensureStyle(style: StyleSpecification): Promise<void> {
+  async ensureStyle(style: StyleSpecification, signal?: AbortSignal): Promise<void> {
     if (this.creating) {
       await this.creating
     }
     if (this.map) {
       return
     }
-    this.creating = this.createMap(style)
+    this.creating = this.createMap(style, signal)
     try {
       await this.creating
     } finally {
@@ -64,7 +85,7 @@ export class ChunkRenderer {
     }
   }
 
-  private async createMap(style: StyleSpecification): Promise<void> {
+  private async createMap(style: StyleSpecification, signal?: AbortSignal): Promise<void> {
     const container = document.createElement('div')
     const css = container.style
     css.position = 'fixed'
@@ -99,7 +120,7 @@ export class ChunkRenderer {
     }
     this.map = map
     try {
-      await onceMapEvent(map, 'load')
+      await waitForMapEvent(map, 'load', signal)
     } catch (err) {
       this.destroy()
       throw err
@@ -111,7 +132,8 @@ export class ChunkRenderer {
     chunk: Chunk,
     pass: PassKind,
     layerMap: LayerMap,
-    style: StyleSpecification
+    style: StyleSpecification,
+    signal?: AbortSignal
   ): Promise<ChunkImage> {
     await this.ensureStyle(style)
     const map = this.map
@@ -122,7 +144,7 @@ export class ChunkRenderer {
     const masked = applyPassMask(style, layerMap, pass)
     map.setStyle(masked, { diff: false })
     map.jumpTo({ center: [chunk.lng, chunk.lat], zoom: plan.zoom, bearing: 0, pitch: 0 })
-    await onceMapEvent(map, 'idle')
+    await waitForMapEvent(map, 'idle', signal)
 
     const png = dataUrlToArrayBuffer(map.getCanvas().toDataURL('image/png'))
     return { col: chunk.col, row: chunk.row, png }

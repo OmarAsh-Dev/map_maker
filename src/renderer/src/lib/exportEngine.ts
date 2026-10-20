@@ -17,13 +17,14 @@ export interface ExportChunkImage {
 }
 
 export interface ExportRenderer {
-  ensureStyle(style: StyleSpecification): Promise<void>
+  ensureStyle(style: StyleSpecification, signal?: AbortSignal): Promise<void>
   renderChunk(
     plan: ChunkPlan,
     chunk: Chunk,
     pass: PassKind,
     layerMap: LayerMap,
-    style: StyleSpecification
+    style: StyleSpecification,
+    signal?: AbortSignal
   ): Promise<ExportChunkImage>
   destroy(): void
 }
@@ -114,14 +115,21 @@ export async function runExport(opts: RunExportOptions): Promise<void> {
     let done = 0
     opts.onProgress(0, total)
     if (total > 0) {
-      await renderer.ensureStyle(scaledStyle)
+      await renderer.ensureStyle(scaledStyle, opts.signal)
     }
     for (const { pass, groupLabel } of passes) {
       for (const chunk of plan.chunks) {
         if (opts.signal.aborted) {
           throw new Error('Export cancelled')
         }
-        const image = await renderer.renderChunk(plan, chunk, pass, opts.layerMap, scaledStyle)
+        const image = await renderer.renderChunk(
+          plan,
+          chunk,
+          pass,
+          opts.layerMap,
+          scaledStyle,
+          opts.signal
+        )
         window.api.sendChunk(groupLabel, image.col, image.row, image.png)
         done += 1
         opts.onProgress(done, total)

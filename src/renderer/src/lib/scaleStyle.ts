@@ -15,8 +15,43 @@ const LAYOUT_PX_PROPS = ['text-size', 'icon-size']
 
 function scaleValue(value: unknown, factor: number): unknown {
   if (typeof value === 'number') return value * factor
-  if (Array.isArray(value)) return ['*', factor, value]
+  if (Array.isArray(value)) return scaleExpression(value, factor)
   return value
+}
+
+function containsZoom(expr: unknown[]): boolean {
+  return expr.some(
+    (part) => Array.isArray(part) && part[0] === 'zoom'
+  )
+}
+
+// MapLibre forbids "zoom" anywhere except as the input of a top-level
+// "interpolate"/"step", so a px prop holding a zoom expression cannot simply
+// be wrapped in ["*", factor, expr]. Instead, scale the interpolation OUTPUTS
+// (the values at each stop) and leave the stops/zoom structure untouched.
+function scaleExpression(expr: unknown[], factor: number): unknown {
+  if (expr[0] === 'interpolate' && Array.isArray(expr[2]) && expr[2][0] === 'zoom') {
+    const out: unknown[] = [expr[0], expr[1], expr[2]]
+    for (let i = 3; i < expr.length; i += 2) {
+      out.push(expr[i]) // stop
+      out.push(scaleValue(expr[i + 1], factor)) // value
+    }
+    return out
+  }
+  if (expr[0] === 'step' && Array.isArray(expr[1]) && expr[1][0] === 'zoom') {
+    const out: unknown[] = [expr[0], expr[1], scaleValue(expr[2], factor)]
+    for (let i = 3; i < expr.length; i += 2) {
+      out.push(expr[i]) // stop
+      out.push(scaleValue(expr[i + 1], factor)) // value
+    }
+    return out
+  }
+  if (!containsZoom(expr)) {
+    return ['*', factor, expr]
+  }
+  // zoom in an unexpected position: leave the expression untouched rather
+  // than emit an invalid style
+  return expr
 }
 
 export function scaleStyleForExport(

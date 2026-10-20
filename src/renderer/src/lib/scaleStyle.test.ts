@@ -53,31 +53,41 @@ describe('scaleStyleForExport', () => {
     expect(layoutOf(scaled, 'road-label')['icon-size']).toBe(4)
   })
 
-  it('wraps expression-valued px props in a multiply instead of overwriting them', () => {
+  it('scales the outputs of zoom interpolations instead of wrapping them', () => {
     const scaled = scaleStyleForExport(style, 4)
     const offset = paintOf(scaled, 'road')['line-offset']
-    expect(Array.isArray(offset)).toBe(true)
-    expect((offset as unknown[])[0]).toBe('*')
-    expect((offset as unknown[])[1]).toBe(4)
-    expect((offset as unknown[])[2]).toEqual([
+    expect(offset).toEqual([
       'interpolate',
       ['linear'],
       ['zoom'],
       10,
       0,
       15,
-      3,
+      12,
     ])
     const textSize = layoutOf(scaled, 'road-label')['text-size']
-    expect((textSize as unknown[])[0]).toBe('*')
-    expect((textSize as unknown[])[2]).toEqual([
-      'interpolate',
-      ['linear'],
-      ['zoom'],
-      10,
-      10,
-      15,
-      14,
+    expect(textSize).toEqual(['interpolate', ['linear'], ['zoom'], 10, 40, 15, 56])
+  })
+
+  it('wraps zoom-free data expressions in a multiply (valid per spec)', () => {
+    const dataStyle = {
+      version: 8,
+      sources: {},
+      layers: [
+        {
+          id: 'road',
+          type: 'line',
+          paint: { 'line-width': ['match', ['get', 'class'], 'motorway', 6, 2] },
+        },
+      ],
+    } as unknown as StyleSpecification
+    const scaled = scaleStyleForExport(dataStyle, 3)
+    const layer = (scaled as unknown as { layers: Array<{ paint: Record<string, unknown> }> })
+      .layers[0]
+    expect(layer.paint['line-width']).toEqual([
+      '*',
+      3,
+      ['match', ['get', 'class'], 'motorway', 6, 2],
     ])
   })
 
