@@ -54,8 +54,6 @@ function statusText(
   }
 }
 
-const TILE_SOURCE_MAXZOOM = 14
-
 export default function ExportDialog() {
   const dialogOpen = useExportStore((state) => state.dialogOpen)
   const mode = useExportStore((state) => state.mode)
@@ -134,7 +132,7 @@ export default function ExportDialog() {
         layerMap,
         outPath,
         attribution: state.attribution,
-        cropZoom: state.cropZoom,
+        cropZoom: state.mapInstance?.getZoom() ?? state.cropZoom,
         onProgress: (done, total) => useExportStore.getState().setRenderProgress(done, total),
         signal: controller.signal,
       })
@@ -266,13 +264,7 @@ export default function ExportDialog() {
 
         <p className="mt-3 text-xs text-gray-500">
           {cropBounds && dims
-            ? `Output ${dims.actualWidth} × ${dims.actualHeight} px at z${dims.zoom.toFixed(
-                1
-              )} — derived from the crop aspect ratio with a ${longEdge} px long edge.${
-                dims.zoom > TILE_SOURCE_MAXZOOM
-                  ? ' This crop derives a zoom above the tile source max (z14), so detail is upscaled and will look soft — crop a larger area or pick a smaller output size for sharper results.'
-                  : ''
-              }`
+            ? `Output ${dims.actualWidth} × ${dims.actualHeight} px. Preserves map styling and detail from the app preview.`
             : 'Select an export area on the map first. The output size derives from the crop aspect ratio.'}
         </p>
 

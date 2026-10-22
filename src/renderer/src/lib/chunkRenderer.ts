@@ -5,6 +5,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { applyPassMask } from './maskPasses'
 import type { PassKind } from './maskPasses'
 import type { Chunk, ChunkPlan } from './chunkPlan'
+import { lngLatToWorldPx, worldPxToLngLat } from './chunkPlan'
 import type { LayerMap } from './styleMap'
 import { applyRequestCaps } from './mapOptions'
 import { dataUrlToArrayBuffer } from './pngDataUrl'
@@ -19,6 +20,7 @@ export interface ChunkImage {
 
 export interface ChunkRendererOptions {
   chunkPx: number
+  pixelRatio?: number
 }
 
 const LOAD_TIMEOUT_MS = 60_000
@@ -62,12 +64,18 @@ function cloneStyle(style: StyleSpecification): StyleSpecification {
 
 export class ChunkRenderer {
   private readonly chunkPx: number
+  private readonly pixelRatio: number
+  private readonly cssPx: number
   private container: HTMLDivElement | null = null
   private map: MaplibreMap | null = null
   private creating: Promise<void> | null = null
 
   constructor(opts: ChunkRendererOptions) {
     this.chunkPx = Math.max(1, Math.round(opts.chunkPx))
+    this.pixelRatio = opts.pixelRatio ?? 1
+    // MapLibre rounds container dimensions to whole CSS pixels. Render enough
+    // pixels to cover a chunk, then trim the excess without resampling.
+    this.cssPx = Math.ceil(this.chunkPx / this.pixelRatio)
   }
 
   async ensureStyle(style: StyleSpecification, signal?: AbortSignal): Promise<void> {
@@ -91,8 +99,8 @@ export class ChunkRenderer {
     css.position = 'fixed'
     css.left = '-99999px'
     css.top = '0px'
-    css.width = `${this.chunkPx}px`
-    css.height = `${this.chunkPx}px`
+    css.width = `${this.cssPx}px`
+    css.height = `${this.cssPx}px`
     css.pointerEvents = 'none'
     document.body.appendChild(container)
     this.container = container
@@ -104,7 +112,10 @@ export class ChunkRenderer {
       maxPitch: 0,
       renderWorldCopies: false,
       attributionControl: false as const,
-      pixelRatio: 1,
+      pixelRatio: this.pixelRatio,
+      interactive: false,
+      trackResize: false,
+      fadeDuration: 0,
       preserveDrawingBuffer: true,
       canvasContextAttributes: { preserveDrawingBuffer: true }
     }
@@ -135,7 +146,7 @@ export class ChunkRenderer {
     style: StyleSpecification,
     signal?: AbortSignal
   ): Promise<ChunkImage> {
-    await this.ensureStyle(style)
+    await this.ensureStyle(style, signal)
     const map = this.map
     if (!map) {
       throw new Error('ChunkRenderer: renderer was destroyed before renderChunk completed')
@@ -143,10 +154,28 @@ export class ChunkRenderer {
 
     const masked = applyPassMask(style, layerMap, pass)
     map.setStyle(masked, { diff: false })
-    map.jumpTo({ center: [chunk.lng, chunk.lat], zoom: plan.zoom, bearing: 0, pitch: 0 })
+    // Keep the preview zoom so every zoom-dependent style property, visibility
+    // threshold and source detail stays the same. Pixel density supplies the
+    // extra resolution; scaling widths as well would thicken roads twice.
+    const zoom = plan.zoom - Math.log2(this.pixelRatio)
+    const centerPx = lngLatToWorldPx(chunk.lng, chunk.lat, plan.zoom)
+    const excess = this.cssPx * this.pixelRatio - this.chunkPx
+    const center = worldPxToLngLat(centerPx.x + excess / 2, centerPx.y + excess / 2, plan.zoom)
+    map.jumpTo({ center: [center.lng, center.lat], zoom, bearing: 0, pitch: 0 })
     await waitForMapEvent(map, 'idle', signal)
 
-    const png = dataUrlToArrayBuffer(map.getCanvas().toDataURL('image/png'))
+    const source = map.getCanvas()
+    const expectedPx = Math.round(this.cssPx * this.pixelRatio)
+    if (source.width !== expectedPx || source.height !== expectedPx) {
+      throw new Error('ChunkRenderer: GPU could not render the requested export resolution')
+    }
+    const canvas = document.createElement('canvas')
+    canvas.width = this.chunkPx
+    canvas.height = this.chunkPx
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('ChunkRenderer: 2D canvas unavailable')
+    context.drawImage(source, 0, 0, this.chunkPx, this.chunkPx, 0, 0, this.chunkPx, this.chunkPx)
+    const png = dataUrlToArrayBuffer(canvas.toDataURL('image/png'))
     return { col: chunk.col, row: chunk.row, png }
   }
 

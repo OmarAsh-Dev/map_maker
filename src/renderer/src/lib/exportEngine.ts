@@ -3,7 +3,6 @@ import { planChunks } from './chunkPlan'
 import type { Chunk, ChunkPlan, CropBounds } from './chunkPlan'
 import { exportGroups } from './maskPasses'
 import type { PassKind } from './maskPasses'
-import { scaleStyleForExport } from './scaleStyle'
 import type { LayerMap } from './styleMap'
 
 const FLAT_GROUP = 'Flat'
@@ -77,14 +76,13 @@ export interface RunExportOptions {
 
 export function exportScaleFactor(planZoom: number, cropZoom: number | null | undefined): number {
   if (cropZoom == null || !Number.isFinite(cropZoom)) return 1
-  return Math.max(1, Math.pow(2, planZoom - cropZoom))
+  return Math.pow(2, planZoom - cropZoom)
 }
 
 export async function runExport(opts: RunExportOptions): Promise<void> {
   const plan = planChunks(opts.bounds, opts.longEdgePx)
   const factor = exportScaleFactor(plan.zoom, opts.cropZoom)
-  const scaledStyle = scaleStyleForExport(opts.style, factor)
-  const groups = opts.mode === 'flat' ? [] : exportGroups(opts.layerMap, scaledStyle)
+  const groups = opts.mode === 'flat' ? [] : exportGroups(opts.layerMap, opts.style)
   const passes = computePasses(opts.mode, groups)
   if (opts.signal.aborted) {
     throw new Error('Export cancelled')
@@ -109,13 +107,13 @@ export async function runExport(opts: RunExportOptions): Promise<void> {
   try {
     if (!renderer) {
       const { ChunkRenderer } = await import('./chunkRenderer')
-      renderer = new ChunkRenderer({ chunkPx: plan.chunkPx })
+      renderer = new ChunkRenderer({ chunkPx: plan.chunkPx, pixelRatio: factor })
     }
     const total = passes.length * plan.chunks.length
     let done = 0
     opts.onProgress(0, total)
     if (total > 0) {
-      await renderer.ensureStyle(scaledStyle, opts.signal)
+      await renderer.ensureStyle(opts.style, opts.signal)
     }
     for (const { pass, groupLabel } of passes) {
       for (const chunk of plan.chunks) {
@@ -127,7 +125,7 @@ export async function runExport(opts: RunExportOptions): Promise<void> {
           chunk,
           pass,
           opts.layerMap,
-          scaledStyle,
+          opts.style,
           opts.signal
         )
         window.api.sendChunk(groupLabel, image.col, image.row, image.png)

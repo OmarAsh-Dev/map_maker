@@ -11,10 +11,14 @@ import { planChunks, worldPxToLngLat } from '../lib/chunkPlan'
 import type { CropBounds } from '../lib/chunkPlan'
 import type { StyleSpecification } from 'maplibre-gl'
 
-const { renderChunkMock } = vi.hoisted(() => ({ renderChunkMock: vi.fn() }))
+const { renderChunkMock, rendererOptionsMock } = vi.hoisted(() => ({
+  renderChunkMock: vi.fn(),
+  rendererOptionsMock: vi.fn(),
+}))
 
 vi.mock('../lib/chunkRenderer', () => ({
   ChunkRenderer: class {
+    constructor(options: unknown) { rendererOptionsMock(options) }
     ensureStyle = async () => {}
     renderChunk = renderChunkMock
     destroy = vi.fn()
@@ -56,6 +60,7 @@ beforeEach(() => {
     mapInstance: null,
     cropMode: false,
     cropBounds: null,
+    cropZoom: null,
     dialogOpen: true,
     mode: 'flat',
     container: 'psd',
@@ -79,6 +84,12 @@ afterEach(() => {
 })
 
 describe('ExportDialog', () => {
+  it('describes matching the preview even when output resolution derives a higher zoom', () => {
+    useExportStore.setState({ cropBounds: BOUNDS, cropZoom: 10 })
+    render(<ExportDialog />)
+    expect(screen.getByText(/preserves map styling and detail from the app preview/i)).toBeInTheDocument()
+    expect(screen.queryByText(/will look soft/i)).not.toBeInTheDocument()
+  })
   it('clamps a custom size above 16K down to 16384', async () => {
     const user = userEvent.setup()
     render(<ExportDialog />)
@@ -184,6 +195,22 @@ describe('ExportDialog', () => {
     })
     expect(api.sendChunk).toHaveBeenCalledTimes(plan.chunks.length)
     expect(useExportStore.getState().status).toBe('done')
+  })
+
+  it('exports using the current preview zoom if the map was zoomed after selecting the crop', async () => {
+    useExportStore.setState({
+      cropBounds: BOUNDS,
+      cropZoom: 10,
+      mapInstance: { getZoom: () => 12 } as NonNullable<ReturnType<typeof useExportStore.getState>['mapInstance']>,
+    })
+    const user = userEvent.setup()
+    render(<ExportDialog />)
+    await user.click(screen.getByRole('button', { name: 'Export' }))
+    await waitFor(() => expect(useExportStore.getState().status).toBe('done'))
+    expect(rendererOptionsMock).toHaveBeenLastCalledWith({
+      chunkPx: 2048,
+      pixelRatio: Math.pow(2, planChunks(BOUNDS, 3840).zoom - 12),
+    })
   })
 
   it('cancel aborts the run and notifies the main process', async () => {

@@ -353,7 +353,7 @@ describe('runExport', () => {
 })
 
 describe('wysiwyg style scaling', () => {
-  it('scales px-denominated style props by 2^(derivedZoom - cropZoom) before rendering', async () => {
+  it('preserves the preview style instead of multiplying zoom-dependent widths again', async () => {
     const { renderer, renderChunk } = createFakeRenderer()
     const plan = planChunks(BASE_BOUNDS, 4096)
     const cropZoom = plan.zoom - 1 // exactly one zoom level below the derived zoom
@@ -365,9 +365,10 @@ describe('wysiwyg style scaling', () => {
     }
     const road = passedStyle.layers.find((l) => l.id === 'road-highway')!
     const label = passedStyle.layers.find((l) => l.id === 'road-highway-label')!
-    expect(road.paint!['line-width']).toBe(4) // 2 × 2
-    expect(label.paint!['text-halo-width']).toBe(3) // 1.5 × 2
-    expect(label.layout!['text-size']).toBe(24) // 12 × 2
+    expect(road.paint!['line-width']).toBe(2)
+    expect(label.paint!['text-halo-width']).toBe(1.5)
+    expect(label.layout!['text-size']).toBe(12)
+    expect(passedStyle).toEqual(STYLE)
   })
 
   it('passes the style through unchanged when no crop zoom is known', async () => {
@@ -381,10 +382,11 @@ describe('wysiwyg style scaling', () => {
     expect(road.paint!['line-width']).toBe(2)
   })
 
-  it('exportScaleFactor never scales down and treats missing zoom as 1', () => {
+  it('exportScaleFactor supports smaller outputs and treats missing zoom as 1', () => {
     expect(exportScaleFactor(14, 12)).toBe(4)
-    expect(exportScaleFactor(12, 14)).toBe(1)
+    expect(exportScaleFactor(12, 14)).toBe(0.25)
     expect(exportScaleFactor(14, null)).toBe(1)
     expect(exportScaleFactor(14, undefined)).toBe(1)
+    expect(exportScaleFactor(14, NaN)).toBe(1)
   })
 })
