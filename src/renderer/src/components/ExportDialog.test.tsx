@@ -89,6 +89,17 @@ describe('ExportDialog', () => {
     render(<ExportDialog />)
     expect(screen.getByText(/preserves map styling and detail from the app preview/i)).toBeInTheDocument()
     expect(screen.queryByText(/will look soft/i)).not.toBeInTheDocument()
+    expect(screen.queryByTestId('overzoom-warning')).not.toBeInTheDocument()
+  })
+
+  it('warns when the derived export zoom exceeds OpenFreeMap max tile zoom (14)', () => {
+    useExportStore.setState({
+      cropBounds: { west: 0, south: 0, east: 0.01, north: 0.01 },
+      sizePreset: '16K',
+    })
+    render(<ExportDialog />)
+    const warning = screen.getByTestId('overzoom-warning')
+    expect(warning).toHaveTextContent(/exceeds OpenFreeMap's max tile zoom \(14\)/i)
   })
   it('clamps a custom size above 32K down to 32768 and supports the 32K preset', async () => {
     const user = userEvent.setup()

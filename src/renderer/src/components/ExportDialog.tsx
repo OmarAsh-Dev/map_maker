@@ -276,6 +276,16 @@ export default function ExportDialog() {
             : 'Select an export area on the map first. The output size derives from the crop aspect ratio.'}
         </p>
 
+        {cropBounds && dims && dims.zoom > 14 && (
+          <p
+            data-testid="overzoom-warning"
+            className="mt-2 rounded bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800"
+          >
+            Note: Derived zoom ({dims.zoom.toFixed(1)}) exceeds OpenFreeMap&apos;s max tile zoom
+            (14); vector features are upscaled without extra detail beyond zoom 14.
+          </p>
+        )}
+
         <label className="mt-3 flex items-center gap-2 text-sm text-gray-800">
           <input type="checkbox" checked={attribution} onChange={handleAttributionChange} />
           Include attribution
