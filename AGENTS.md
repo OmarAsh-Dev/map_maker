@@ -5,7 +5,7 @@
 Desktop clone of [mapbuilder.app/map](https://mapbuilder.app/map) — a map customizer and high-resolution exporter — with two differences:
 
 - **Tiles from OpenFreeMap** (not Google/OpenMapTiles).
-- **All map features are editable**, and the crop/export area supports **up to 32k** output.
+- **All map features are editable**, and the crop/export area supports **up to 16k** output.
 
 Users style/recolor map features, add overlays (markers, lines, shapes, text), drag-select a region, and export a high-resolution image. Final deliverable is a **Windows .exe**.
 

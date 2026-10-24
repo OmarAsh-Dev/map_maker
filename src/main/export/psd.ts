@@ -10,41 +10,33 @@ export interface PsdLayer {
 const MAX_PSD_DIMENSION = 30000
 
 type PsdCanvas = NonNullable<Layer['canvas']>
-type PsdImageData = NonNullable<Layer['imageData']>
-type CreateImageDataResult = ReturnType<NonNullable<Parameters<typeof initializeCanvas>[1]>>
 
 let canvasReady = false
 
 function ensureCanvasInitialized(): void {
   if (canvasReady) return
-  initializeCanvas(
-    (width, height) => createCanvas(width, height) as unknown as PsdCanvas,
-    (width, height) =>
-      ({
-        width,
-        height,
-        data: new Uint8ClampedArray(width * height * 4),
-      }) as unknown as CreateImageDataResult
-  )
+  initializeCanvas((width, height) => createCanvas(width, height) as unknown as PsdCanvas)
   canvasReady = true
 }
 
-async function pngToImageData(png: Buffer, width: number, height: number): Promise<PsdImageData> {
+async function pngToCanvas(png: Buffer, width: number, height: number): Promise<PsdCanvas> {
   const { data, info } = await sharp(png, { limitInputPixels: false })
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true })
-  const pixels = new Uint8ClampedArray(width * height * 4)
+  const canvas = createCanvas(width, height) as unknown as PsdCanvas
+  const ctx = canvas.getContext('2d')!
+  const imageData = ctx.createImageData(width, height)
   const rows = Math.min(info.height, height)
-  const rowBytes = Math.min(info.width, width) * 4
   for (let y = 0; y < rows; y++) {
     const src = y * info.width * 4
-    pixels.set(data.subarray(src, src + rowBytes), y * width * 4)
+    imageData.data.set(data.subarray(src, src + Math.min(info.width, width) * 4), y * width * 4)
   }
-  return { width, height, data: pixels }
+  ctx.putImageData(imageData, 0, 0)
+  return canvas
 }
 
-async function flattenLayers(layers: PsdLayer[], width: number, height: number): Promise<PsdImageData> {
+async function flattenLayers(layers: PsdLayer[], width: number, height: number): Promise<PsdCanvas> {
   const base = sharp({
     create: { width, height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
     limitInputPixels: false,
@@ -65,10 +57,12 @@ async function flattenLayers(layers: PsdLayer[], width: number, height: number):
     .ensureAlpha()
     .raw()
     .toBuffer()
-  const bytes = width * height * 4
-  const slice = flat.subarray(0, bytes)
-  const data = new Uint8ClampedArray(slice.buffer, slice.byteOffset, slice.byteLength)
-  return { width, height, data }
+  const canvas = createCanvas(width, height) as unknown as PsdCanvas
+  const ctx = canvas.getContext('2d')!
+  const imageData = ctx.createImageData(width, height)
+  imageData.data.set(flat.subarray(0, width * height * 4))
+  ctx.putImageData(imageData, 0, 0)
+  return canvas
 }
 
 export async function assemblePsd(layers: PsdLayer[], width: number, height: number): Promise<Buffer> {
@@ -82,7 +76,7 @@ export async function assemblePsd(layers: PsdLayer[], width: number, height: num
       left: 0,
       bottom: height,
       right: width,
-      imageData: await pngToImageData(layer.png, width, height),
+      canvas: await pngToCanvas(layer.png, width, height),
     })
   }
 
@@ -90,7 +84,7 @@ export async function assemblePsd(layers: PsdLayer[], width: number, height: num
     width,
     height,
     children: children.slice().reverse(),
-    imageData: await flattenLayers(layers, width, height),
+    canvas: await flattenLayers(layers, width, height),
   }
 
   return writePsdBuffer(psd, {

@@ -4,7 +4,7 @@
   <img src="build/icon.png" width="96" height="96" alt="Map Maker Logo" />
 </p>
 
-A Windows desktop map customizer and high-resolution exporter — a desktop take on [mapbuilder.app](https://mapbuilder.app/map), built on **OpenFreeMap** tiles (free, no API key) with **all map features editable** and exports up to **32k**, designed for After Effects workflows.
+A Windows desktop map customizer and high-resolution exporter — a desktop take on [mapbuilder.app](https://mapbuilder.app/map), built on **OpenFreeMap** tiles (free, no API key) with **all map features editable** and exports up to **16k**, designed for After Effects workflows.
 
 ## Features
 
@@ -12,13 +12,13 @@ A Windows desktop map customizer and high-resolution exporter — a desktop take
 - **Labels master toggle** — hide every label layer at once
 - **Basemap switcher** — Liberty (default), Bright, Positron, Dark, Fiord, all hosted by OpenFreeMap
 - **Presets** — save/load your style locally as JSON
-- **Crop & export** — drag a rectangle on the map (with 8 resize handles, drag-to-move, and live pixel dimensions), pick 1080p / 4K / 8K / 16K / 32K (or custom, capped at 32,768 px), optional 16:9 / 9:16 / 1:1 ratio locks
+- **Crop & export** — drag a rectangle on the map (with 8 resize handles, drag-to-move, and live pixel dimensions), pick 1080p / 4K / 8K / 16K (or custom, capped at 16,384 px), optional 16:9 / 9:16 / 1:1 ratio locks
 - **Two export modes**
   - **Flat** — one PNG
-  - **Layered** — After Effects-ready PSD / PSB (or a folder of transparent PNGs) with each category as geometry + labels layers, ordered bottom→top like the map
+  - **Layered** — After Effects-ready PSD (or a folder of transparent PNGs) with each category as geometry + labels layers, ordered bottom→top like the map
 - **WYSIWYG exports** — line widths, text and icon sizes are scaled by the export/view ratio so the output proportions match what you see in the app
 - **Attribution** — © OpenStreetMap contributors burned in by default; removable after an explicit license warning
-- Up to 32k exports are tile-stitched offscreen in chunks, so they work on any GPU, with progress and cancel
+- 16k exports are tile-stitched offscreen in chunks, so they work on any GPU, with progress and cancel
 
 ## Stack
 

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import type { ChangeEvent } from 'react'
-import AppLogo from './AppLogo'
 import { MAX_EXPORT_PX, planChunks } from '../lib/chunkPlan'
 import { runExport } from '../lib/exportEngine'
 import {
@@ -111,7 +110,6 @@ export default function ExportDialog() {
     if (typeof window.api !== 'undefined') {
       window.api.cancelExport()
     }
-    state.endExport('cancelled', 'Export cancelled')
   }
 
   const handleExport = async () => {
@@ -120,15 +118,7 @@ export default function ExportDialog() {
       return
     }
     const kind = state.mode === 'flat' ? 'png' : state.container
-    const isLargePsb = Boolean(dims && (dims.actualWidth > 30000 || dims.actualHeight > 30000))
-    const defaultName =
-      state.mode === 'flat'
-        ? 'map.png'
-        : state.container === 'psd'
-          ? isLargePsb
-            ? 'map.psb'
-            : 'map.psd'
-          : 'map-layers'
+    const defaultName = state.mode === 'flat' ? 'map.png' : state.container === 'psd' ? 'map.psd' : 'map-layers'
     const outPath = await window.api.selectExportPath(defaultName, kind)
     if (!outPath) return
     const controller = state.beginExportState()
@@ -147,12 +137,10 @@ export default function ExportDialog() {
         signal: controller.signal,
       })
       const after = useExportStore.getState()
-      if (!controller.signal.aborted && after.status !== 'cancelled') {
-        after.endExport('done')
-      }
+      after.endExport('done')
     } catch (err) {
       const after = useExportStore.getState()
-      if (controller.signal.aborted || after.status === 'cancelled') {
+      if (controller.signal.aborted) {
         after.endExport('cancelled', 'Export cancelled')
       } else if (after.status !== 'error') {
         after.endExport('error', err instanceof Error ? err.message : String(err))
@@ -167,10 +155,7 @@ export default function ExportDialog() {
       className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/50"
     >
       <div className="relative w-[26rem] max-w-full rounded-lg bg-white p-5 shadow-xl">
-        <div className="flex items-center gap-2.5">
-          <AppLogo className="h-6 w-6 shrink-0" />
-          <h2 className="text-base font-semibold text-slate-900">Export map</h2>
-        </div>
+        <h2 className="text-base font-semibold text-slate-900">Export map</h2>
 
         <fieldset className="mt-4" aria-label="Export mode">
           <legend className="text-xs font-medium uppercase tracking-wide text-gray-500">Mode</legend>
@@ -282,16 +267,6 @@ export default function ExportDialog() {
             ? `Output ${dims.actualWidth} × ${dims.actualHeight} px. Preserves map styling and detail from the app preview.`
             : 'Select an export area on the map first. The output size derives from the crop aspect ratio.'}
         </p>
-
-        {cropBounds && dims && dims.zoom > 14 && (
-          <p
-            data-testid="overzoom-warning"
-            className="mt-2 rounded bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800"
-          >
-            Note: Derived zoom ({dims.zoom.toFixed(1)}) exceeds OpenFreeMap&apos;s max tile zoom
-            (14); vector features are upscaled without extra detail beyond zoom 14.
-          </p>
-        )}
 
         <label className="mt-3 flex items-center gap-2 text-sm text-gray-800">
           <input type="checkbox" checked={attribution} onChange={handleAttributionChange} />

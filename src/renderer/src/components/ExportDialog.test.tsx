@@ -89,36 +89,18 @@ describe('ExportDialog', () => {
     render(<ExportDialog />)
     expect(screen.getByText(/preserves map styling and detail from the app preview/i)).toBeInTheDocument()
     expect(screen.queryByText(/will look soft/i)).not.toBeInTheDocument()
-    expect(screen.queryByTestId('overzoom-warning')).not.toBeInTheDocument()
   })
-
-  it('warns when the derived export zoom exceeds OpenFreeMap max tile zoom (14)', () => {
-    useExportStore.setState({
-      cropBounds: { west: 0, south: 0, east: 0.01, north: 0.01 },
-      sizePreset: '16K',
-    })
-    render(<ExportDialog />)
-    const warning = screen.getByTestId('overzoom-warning')
-    expect(warning).toHaveTextContent(/exceeds OpenFreeMap's max tile zoom \(14\)/i)
-  })
-  it('clamps a custom size above 32K down to 32768 and supports the 32K preset', async () => {
+  it('clamps a custom size above 16K down to 16384', async () => {
     const user = userEvent.setup()
     render(<ExportDialog />)
     const input = screen.getByLabelText('Custom long edge')
 
     await user.clear(input)
-    await user.type(input, '40000')
+    await user.type(input, '20000')
 
-    expect((input as HTMLInputElement).value).toBe('32768')
-    expect(useExportStore.getState().customLongEdge).toBe(32768)
+    expect((input as HTMLInputElement).value).toBe('16384')
+    expect(useExportStore.getState().customLongEdge).toBe(16384)
     expect(useExportStore.getState().sizePreset).toBe('custom')
-
-    await user.click(screen.getByRole('radio', { name: '32K' }))
-    expect(useExportStore.getState().sizePreset).toBe('32K')
-
-    useExportStore.setState({ cropBounds: BOUNDS, mode: 'layered', container: 'psd' })
-    await user.click(screen.getByRole('button', { name: 'Export' }))
-    expect(api.selectExportPath).toHaveBeenCalledWith('map.psb', 'psd')
   })
 
   it('shows container options only for layered mode and toggles them', async () => {
@@ -231,12 +213,7 @@ describe('ExportDialog', () => {
     })
   })
 
-  it('cancel immediately stops the export, updates UI to cancelled, and ignores late progress', async () => {
-    let progressCb: ((p: ExportMainProgress) => void) | null = null
-    api.onExportProgress.mockImplementation((cb: (p: ExportMainProgress) => void) => {
-      progressCb = cb
-      return () => {}
-    })
+  it('cancel aborts the run and notifies the main process', async () => {
     useExportStore.setState({ cropBounds: BOUNDS })
     renderChunkMock.mockImplementation(() => new Promise(() => {}))
     const user = userEvent.setup()
@@ -247,19 +224,6 @@ describe('ExportDialog', () => {
 
     expect(api.cancelExport).toHaveBeenCalledTimes(1)
     expect(useExportStore.getState().abortController?.signal.aborted).toBe(true)
-    expect(useExportStore.getState().exporting).toBe(false)
-    expect(useExportStore.getState().status).toBe('cancelled')
-    expect(screen.getByText('Export cancelled')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Close' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'Export' })).toBeEnabled()
-
-    // Late IPC progress after cancel must not flip status back to compositing/done
-    act(() => {
-      progressCb?.({ stage: 'compositing', group: 'Flat', done: 1, total: 1 })
-      useExportStore.getState().setRenderProgress(2, 4)
-    })
-    expect(useExportStore.getState().status).toBe('cancelled')
-    expect(useExportStore.getState().exporting).toBe(false)
   })
 
   it('keeps the main-process error message instead of double-reporting the finish rejection', async () => {

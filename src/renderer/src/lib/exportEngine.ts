@@ -3,12 +3,10 @@ import { planChunks } from './chunkPlan'
 import type { Chunk, ChunkPlan, CropBounds } from './chunkPlan'
 import { exportGroups } from './maskPasses'
 import type { PassKind } from './maskPasses'
-import { scaleStyleForExport } from './scaleStyle'
 import type { LayerMap } from './styleMap'
 
 const FLAT_GROUP = 'Flat'
 
-export const MAX_PIXEL_RATIO = 4
 export const ATTRIBUTION_TEXT = '© OpenStreetMap contributors'
 
 export interface ExportChunkImage {
@@ -81,39 +79,10 @@ export function exportScaleFactor(planZoom: number, cropZoom: number | null | un
   return Math.pow(2, planZoom - cropZoom)
 }
 
-function raceAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-  if (signal.aborted) {
-    return Promise.reject(new Error('Export cancelled'))
-  }
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = () => {
-      reject(new Error('Export cancelled'))
-    }
-    signal.addEventListener('abort', onAbort, { once: true })
-    promise.then(
-      (val) => {
-        signal.removeEventListener('abort', onAbort)
-        resolve(val)
-      },
-      (err) => {
-        signal.removeEventListener('abort', onAbort)
-        reject(err)
-      }
-    )
-  })
-}
-
-function yieldToUi(signal: AbortSignal): Promise<void> {
-  return raceAbort(new Promise<void>((resolve) => setTimeout(resolve, 0)), signal)
-}
-
 export async function runExport(opts: RunExportOptions): Promise<void> {
   const plan = planChunks(opts.bounds, opts.longEdgePx)
   const factor = exportScaleFactor(plan.zoom, opts.cropZoom)
-  const deviceRatio = Math.min(factor, MAX_PIXEL_RATIO)
-  const styleScale = factor > MAX_PIXEL_RATIO ? factor / deviceRatio : 1
-  const exportStyle = styleScale === 1 ? opts.style : scaleStyleForExport(opts.style, styleScale)
-  const groups = opts.mode === 'flat' ? [] : exportGroups(opts.layerMap, exportStyle)
+  const groups = opts.mode === 'flat' ? [] : exportGroups(opts.layerMap, opts.style)
   const passes = computePasses(opts.mode, groups)
   if (opts.signal.aborted) {
     throw new Error('Export cancelled')
@@ -135,61 +104,44 @@ export async function runExport(opts: RunExportOptions): Promise<void> {
   })
 
   let renderer = opts.renderer
-  let destroyed = false
-  const destroyRenderer = () => {
-    if (destroyed || !renderer) return
-    destroyed = true
-    renderer.destroy()
-  }
-  const onAbort = () => {
-    destroyRenderer()
-  }
-  opts.signal.addEventListener('abort', onAbort, { once: true })
-
   try {
     if (!renderer) {
-      const { ChunkRenderer } = await raceAbort(import('./chunkRenderer'), opts.signal)
-      if (opts.signal.aborted) {
-        throw new Error('Export cancelled')
-      }
-      renderer = new ChunkRenderer({ chunkPx: plan.chunkPx, pixelRatio: deviceRatio })
+      const { ChunkRenderer } = await import('./chunkRenderer')
+      renderer = new ChunkRenderer({ chunkPx: plan.chunkPx, pixelRatio: factor })
     }
     const total = passes.length * plan.chunks.length
     let done = 0
     opts.onProgress(0, total)
     if (total > 0) {
-      await raceAbort(renderer.ensureStyle(exportStyle, opts.signal), opts.signal)
+      await renderer.ensureStyle(opts.style, opts.signal)
     }
     for (const { pass, groupLabel } of passes) {
       for (const chunk of plan.chunks) {
-        await yieldToUi(opts.signal)
-        const image = await raceAbort(
-          renderer.renderChunk(
-            plan,
-            chunk,
-            pass,
-            opts.layerMap,
-            exportStyle,
-            opts.signal
-          ),
-          opts.signal
-        )
         if (opts.signal.aborted) {
           throw new Error('Export cancelled')
         }
+        const image = await renderer.renderChunk(
+          plan,
+          chunk,
+          pass,
+          opts.layerMap,
+          opts.style,
+          opts.signal
+        )
         window.api.sendChunk(groupLabel, image.col, image.row, image.png)
         done += 1
         opts.onProgress(done, total)
       }
     }
-    await raceAbort(window.api.finishExport(), opts.signal)
+    await window.api.finishExport()
   } catch (err) {
     if (!opts.signal.aborted) {
       window.api.cancelExport()
     }
     throw err
   } finally {
-    opts.signal.removeEventListener('abort', onAbort)
-    destroyRenderer()
+    if (renderer) {
+      renderer.destroy()
+    }
   }
 }

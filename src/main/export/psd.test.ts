@@ -64,23 +64,6 @@ describe('assemblePsd', () => {
     expect(psd.children![0].name).toBe('Huge')
   })
 
-  it('assembles a 32768-px wide PSB layer past node-canvas 32767-px Cairo limit', async () => {
-    const png = await sharp({
-      create: { width: 32768, height: 8, channels: 4, background: { r: 20, g: 120, b: 220, alpha: 1 } },
-      limitInputPixels: false,
-    })
-      .png()
-      .toBuffer()
-
-    const buffer = await assemblePsd([{ name: 'Wide32k', png }], 32768, 8)
-
-    expect(buffer.readUInt16BE(4)).toBe(2)
-    const psd = readPsd(buffer, { useImageData: true })
-    expect(psd.width).toBe(32768)
-    expect(psd.height).toBe(8)
-    expect(psd.children![0].name).toBe('Wide32k')
-  })
-
   it('assembles a square 16k layer past sharp default input pixel limit', async () => {
     const size = 16384
     const png = await sharp({

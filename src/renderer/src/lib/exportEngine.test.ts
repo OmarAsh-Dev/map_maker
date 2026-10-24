@@ -207,23 +207,10 @@ describe('runExport', () => {
     ).rejects.toThrow(/cancel/i)
 
     expect(calls).toHaveLength(2)
-    expect(fakeApi.sendChunk).toHaveBeenCalledTimes(1)
+    expect(fakeApi.sendChunk).toHaveBeenCalledTimes(2)
     expect(fakeApi.finishExport).not.toHaveBeenCalled()
     expect(fakeApi.cancelExport).not.toHaveBeenCalled()
     expect(renderer.destroy).toHaveBeenCalledTimes(1)
-  })
-
-  it('aborts immediately when signal fires while renderChunk or finishExport is hung', async () => {
-    const { renderer, renderChunk } = createFakeRenderer()
-    const controller = new AbortController()
-    ;(renderChunk as Mock).mockImplementation(() => new Promise(() => {}))
-
-    const promise = runExport(baseOpts({ renderer, signal: controller.signal }))
-    setTimeout(() => controller.abort(), 10)
-
-    await expect(promise).rejects.toThrow(/cancel/i)
-    expect(renderer.destroy).toHaveBeenCalled()
-    expect(fakeApi.finishExport).not.toHaveBeenCalled()
   })
 
   it('rejects without beginning or rendering when the signal is already aborted', async () => {
@@ -382,23 +369,6 @@ describe('wysiwyg style scaling', () => {
     expect(label.paint!['text-halo-width']).toBe(1.5)
     expect(label.layout!['text-size']).toBe(12)
     expect(passedStyle).toEqual(STYLE)
-  })
-
-  it('scales style px properties via scaleStyleForExport when export/view ratio exceeds MAX_PIXEL_RATIO (4)', async () => {
-    const { renderer, renderChunk } = createFakeRenderer()
-    const plan = planChunks(BASE_BOUNDS, 4096)
-    const cropZoom = plan.zoom - 3 // factor = 2^3 = 8 -> deviceRatio = 4, styleScale = 2
-    await runExport(baseOpts({ renderer, cropZoom }))
-
-    expect(renderChunk).toHaveBeenCalled()
-    const passedStyle = (renderChunk.mock.calls[0] as unknown[])[4] as {
-      layers: Array<{ id: string; paint?: Record<string, unknown>; layout?: Record<string, unknown> }>
-    }
-    const road = passedStyle.layers.find((l) => l.id === 'road-highway')!
-    const label = passedStyle.layers.find((l) => l.id === 'road-highway-label')!
-    expect(road.paint!['line-width']).toBe(4)
-    expect(label.paint!['text-halo-width']).toBe(3)
-    expect(label.layout!['text-size']).toBe(24)
   })
 
   it('passes the style through unchanged when no crop zoom is known', async () => {

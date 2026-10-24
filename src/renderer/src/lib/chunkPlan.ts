@@ -24,7 +24,7 @@ export interface ChunkPlan {
   chunks: Chunk[]
 }
 
-export const MAX_EXPORT_PX = 32768
+export const MAX_EXPORT_PX = 16384
 
 const TILE_PX = 512
 const MAX_LAT = 85.051129

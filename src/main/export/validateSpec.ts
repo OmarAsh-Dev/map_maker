@@ -1,6 +1,6 @@
 import { isAbsolute } from 'node:path'
 
-const MAX_DIM = 32768
+const MAX_DIM = 16384
 
 function assertPositiveInt(value: unknown, name: string): number {
   if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {

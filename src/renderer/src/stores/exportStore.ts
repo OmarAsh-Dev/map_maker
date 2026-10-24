@@ -5,7 +5,7 @@ import type { CropBounds } from '../lib/chunkPlan'
 
 export type ExportMode = 'flat' | 'layered'
 export type ExportContainer = 'psd' | 'png-folder'
-export type SizePresetId = '1080p' | '4K' | '8K' | '16K' | '32K' | 'custom'
+export type SizePresetId = '1080p' | '4K' | '8K' | '16K' | 'custom'
 export type AspectRatioId = 'free' | '16:9' | '9:16' | '1:1'
 
 export const ASPECT_RATIO_PRESETS: {
@@ -24,7 +24,6 @@ export const SIZE_PRESETS: { id: Exclude<SizePresetId, 'custom'>; label: string;
   { id: '4K', label: '4K', longEdge: 3840 },
   { id: '8K', label: '8K', longEdge: 8192 },
   { id: '16K', label: '16K', longEdge: 16384 },
-  { id: '32K', label: '32K', longEdge: 32768 },
 ]
 
 export function clampLongEdge(px: number): number {
@@ -159,16 +158,8 @@ export const useExportStore = create<ExportState>()((set, get) => ({
     })
     return controller
   },
-  setRenderProgress: (done, total) => {
-    if (!get().exporting || get().status === 'cancelled' || get().abortController?.signal.aborted) {
-      return
-    }
-    set({ renderDone: done, renderTotal: total })
-  },
+  setRenderProgress: (done, total) => set({ renderDone: done, renderTotal: total }),
   handleMainProgress: (progress) => {
-    if (get().status === 'cancelled' || get().abortController?.signal.aborted) {
-      return
-    }
     if (progress.stage === 'compositing') {
       set({ status: 'compositing', compositeDone: progress.done, compositeTotal: progress.total })
       return

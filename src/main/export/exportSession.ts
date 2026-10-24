@@ -94,7 +94,7 @@ export class ExportSession {
         total: this.totalGroups,
       })
     } catch (err) {
-      if (!this.cancelled && !this.failureMessage) {
+      if (!this.failureMessage) {
         this.fail(err instanceof Error ? err.message : String(err))
       }
     } finally {
@@ -116,6 +116,7 @@ export class ExportSession {
         throw new Error(this.failureMessage!)
       }
       this.onProgress({ stage: 'assembling' })
+      await mkdir(dirname(this.spec.outPath), { recursive: true })
       let png = this.composited.get(FLAT_GROUP)!
       if (this.spec.attribution !== null) {
         const overlay = await renderAttributionPng(
@@ -123,15 +124,11 @@ export class ExportSession {
           this.spec.outHeight,
           this.spec.attribution
         )
-        this.assertUsable()
         png = await sharp(this.composited.get(FLAT_GROUP)!, { limitInputPixels: false })
           .composite([{ input: overlay, left: 0, top: 0, limitInputPixels: false }])
           .png()
           .toBuffer()
       }
-      this.assertUsable()
-      await mkdir(dirname(this.spec.outPath), { recursive: true })
-      this.assertUsable()
       await writeFile(this.spec.outPath, png)
       this.finished = true
       this.onProgress({ stage: 'done', path: this.spec.outPath })
@@ -162,11 +159,8 @@ export class ExportSession {
           ),
         })
       }
-      this.assertUsable()
       const buffer = await assemblePsd(layers, this.spec.outWidth, this.spec.outHeight)
-      this.assertUsable()
       await mkdir(dirname(this.spec.outPath), { recursive: true })
-      this.assertUsable()
       await writeFile(this.spec.outPath, buffer)
       this.finished = true
       this.onProgress({ stage: 'done', path: this.spec.outPath })
@@ -175,14 +169,12 @@ export class ExportSession {
 
     await mkdir(this.spec.outPath, { recursive: true })
     for (const group of this.spec.groups) {
-      this.assertUsable()
       await writeFile(
         join(this.spec.outPath, `${slugify(group.label)}.png`),
         this.composited.get(group.label)!
       )
     }
     if (this.spec.attribution !== null) {
-      this.assertUsable()
       await writeFile(
         join(this.spec.outPath, 'Attribution.png'),
         await renderAttributionPng(
@@ -192,7 +184,6 @@ export class ExportSession {
         )
       )
     }
-    this.assertUsable()
     this.finished = true
     this.onProgress({ stage: 'done', path: this.spec.outPath })
   }
