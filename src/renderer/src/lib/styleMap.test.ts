@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { StyleSpecification } from 'maplibre-gl'
 import { CATEGORY_GROUPS } from './categories'
-import { aggregateGroup, applyCategoryPatch, readCategory } from './styleMap'
+import { aggregateGroup, applyCategoryPatch, normalizeColorToHex, readCategory } from './styleMap'
 import type { LayerMap } from './styleMap'
 
 const FIXTURE_MAP: LayerMap = {
@@ -190,6 +190,38 @@ describe('readCategory', () => {
     expect(state.geometryStroke).toBe('mixed')
     expect(state.labelFill).toBe('#000000')
     expect(state.labelIconColor).toBe('#000000')
+  })
+
+  it('normalizes hsl, hsla, rgb, rgba, 3-digit hex, and zoom-interpolated colors to 6-digit hex', () => {
+    expect(normalizeColorToHex('#f0a')).toBe('#ff00aa')
+    expect(normalizeColorToHex('rgb(17, 145, 189)')).toBe('#1191bd')
+    expect(normalizeColorToHex('rgba(17, 145, 189, 0.75)')).toBe('#1191bd')
+    expect(normalizeColorToHex('hsl(210, 50%, 40%)')).toBe('#336699')
+    expect(normalizeColorToHex('hsla(210, 50%, 40%, 0.9)')).toBe('#336699')
+    expect(
+      normalizeColorToHex([
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        9,
+        'hsl(210, 50%, 40%)',
+        12,
+        'hsl(210, 50%, 40%)',
+      ])
+    ).toBe('#336699')
+  })
+
+  it('aggregates child categories when reading a parent group id', () => {
+    const childOnlyMap: LayerMap = {
+      'road.highway': { fill: ['road-highway'], casing: [], labels: [] },
+      'road.arterial': { fill: ['water-fill'], casing: [], labels: [] },
+    }
+    expect(readCategory(baseStyle, childOnlyMap, 'road').geometryFill).toBe('mixed')
+
+    const matchingStyle = applyCategoryPatch(baseStyle, childOnlyMap, 'road.arterial', {
+      geometryFill: '#eecc66',
+    })
+    expect(readCategory(matchingStyle, childOnlyMap, 'road').geometryFill).toBe('#eecc66')
   })
 })
 

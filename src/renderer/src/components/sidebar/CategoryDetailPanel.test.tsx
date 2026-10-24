@@ -191,3 +191,11 @@ it('label icon eye reflects the newly selected category style instead of stale l
   state = useMapStore.getState()
   expect(paintOf(state.style as StyleSpecification, 'road-label', 'icon-opacity')).toBe(0)
 })
+
+it('displays resolved hex color in the picker for hsl and zoom-interpolated colors', () => {
+  useMapStore.getState().selectCategory('landscape')
+  render(<CategoryDetailPanel />)
+  const field = screen.getByTestId('field-geometry-fill')
+  expect(within(field).queryByText('Mixed')).not.toBeInTheDocument()
+  expect(within(field).getByLabelText('Geometry fill')).toHaveValue('#dad8d8')
+})

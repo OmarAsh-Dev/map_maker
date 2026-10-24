@@ -112,3 +112,34 @@ it('clicking a row selects its category', () => {
   fireEvent.click(screen.getByText('Points of interest'))
   expect(useMapStore.getState().selectedCategoryId).toBe('poi')
 })
+
+it('renders a resolved hex swatch when a category layer uses zoom-interpolated hsl() syntax', () => {
+  const hslStyle = {
+    version: 8,
+    sources: {},
+    layers: [
+      {
+        id: 'water-fill',
+        type: 'fill',
+        paint: {
+          'fill-color': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            5,
+            'hsl(210, 50%, 40%)',
+            12,
+            'hsl(210, 50%, 40%)',
+          ],
+        },
+      },
+    ],
+  } as unknown as StyleSpecification
+  useMapStore.setState({
+    style: hslStyle,
+    layerMap: { water: { fill: ['water-fill'], casing: [], labels: [] } },
+  })
+  const { container } = render(<FeatureTree />)
+  const swatch = container.querySelector('[data-testid="swatch-water"]')
+  expect(swatch).toHaveStyle({ backgroundColor: 'rgb(51, 102, 153)' })
+})
