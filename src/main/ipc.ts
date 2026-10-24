@@ -67,7 +67,7 @@ export function registerExportIpc(): void {
       defaultPath: defaultName,
       filters:
         kind === 'psd'
-          ? [{ name: 'Photoshop PSD', extensions: ['psd'] }]
+          ? [{ name: 'Photoshop PSD/PSB', extensions: ['psd', 'psb'] }]
           : [{ name: 'PNG Image', extensions: ['png'] }],
     })
     return result.canceled || !result.filePath ? null : result.filePath

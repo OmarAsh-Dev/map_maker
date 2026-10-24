@@ -118,7 +118,15 @@ export default function ExportDialog() {
       return
     }
     const kind = state.mode === 'flat' ? 'png' : state.container
-    const defaultName = state.mode === 'flat' ? 'map.png' : state.container === 'psd' ? 'map.psd' : 'map-layers'
+    const isLargePsb = Boolean(dims && (dims.actualWidth > 30000 || dims.actualHeight > 30000))
+    const defaultName =
+      state.mode === 'flat'
+        ? 'map.png'
+        : state.container === 'psd'
+          ? isLargePsb
+            ? 'map.psb'
+            : 'map.psd'
+          : 'map-layers'
     const outPath = await window.api.selectExportPath(defaultName, kind)
     if (!outPath) return
     const controller = state.beginExportState()

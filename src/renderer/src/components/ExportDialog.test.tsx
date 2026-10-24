@@ -90,17 +90,24 @@ describe('ExportDialog', () => {
     expect(screen.getByText(/preserves map styling and detail from the app preview/i)).toBeInTheDocument()
     expect(screen.queryByText(/will look soft/i)).not.toBeInTheDocument()
   })
-  it('clamps a custom size above 16K down to 16384', async () => {
+  it('clamps a custom size above 32K down to 32768 and supports the 32K preset', async () => {
     const user = userEvent.setup()
     render(<ExportDialog />)
     const input = screen.getByLabelText('Custom long edge')
 
     await user.clear(input)
-    await user.type(input, '20000')
+    await user.type(input, '40000')
 
-    expect((input as HTMLInputElement).value).toBe('16384')
-    expect(useExportStore.getState().customLongEdge).toBe(16384)
+    expect((input as HTMLInputElement).value).toBe('32768')
+    expect(useExportStore.getState().customLongEdge).toBe(32768)
     expect(useExportStore.getState().sizePreset).toBe('custom')
+
+    await user.click(screen.getByRole('radio', { name: '32K' }))
+    expect(useExportStore.getState().sizePreset).toBe('32K')
+
+    useExportStore.setState({ cropBounds: BOUNDS, mode: 'layered', container: 'psd' })
+    await user.click(screen.getByRole('button', { name: 'Export' }))
+    expect(api.selectExportPath).toHaveBeenCalledWith('map.psb', 'psd')
   })
 
   it('shows container options only for layered mode and toggles them', async () => {

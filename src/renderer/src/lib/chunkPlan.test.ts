@@ -12,8 +12,8 @@ import type { CropBounds } from './chunkPlan'
 const FULL_WORLD: CropBounds = { west: -180, east: 180, south: -85.051129, north: 85.051129 }
 
 describe('MAX_EXPORT_PX', () => {
-  it('caps exports at 16384 px', () => {
-    expect(MAX_EXPORT_PX).toBe(16384)
+  it('caps exports at 32768 px', () => {
+    expect(MAX_EXPORT_PX).toBe(32768)
   })
 })
 
@@ -101,11 +101,24 @@ describe('planChunks', () => {
     }
   })
 
+  it('plans a 16x16 grid for the full world at 32768 px with 2048 px chunks', () => {
+    const plan = planChunks(FULL_WORLD, 32768, 2048)
+    expect(plan.zoom).toBe(6)
+    expect(plan.cols).toBe(16)
+    expect(plan.rows).toBe(16)
+    expect(plan.chunks.length).toBe(256)
+    const last = plan.chunks[plan.chunks.length - 1]
+    expect(last.centerX).toBe(31744)
+    expect(last.centerY).toBe(31744)
+    expect(last.centerX).toBeLessThan(32768)
+    expect(last.centerY).toBeLessThan(32768)
+  })
+
   it('clamps longEdgePx above MAX_EXPORT_PX', () => {
     const plan = planChunks(FULL_WORLD, 99999)
-    expect(Math.max(plan.actualWidth, plan.actualHeight)).toBe(16384)
+    expect(Math.max(plan.actualWidth, plan.actualHeight)).toBe(32768)
     const regional = planChunks({ west: -10, east: 10, south: -10, north: 10 }, 99999)
-    expect(Math.max(regional.actualWidth, regional.actualHeight)).toBeLessThanOrEqual(16384)
+    expect(Math.max(regional.actualWidth, regional.actualHeight)).toBeLessThanOrEqual(32768)
   })
 
   it('clamps latitudes beyond the mercator limit instead of producing NaN', () => {

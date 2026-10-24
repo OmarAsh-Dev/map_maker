@@ -39,9 +39,9 @@ describe('validateExportSpec', () => {
     ['fractional rows', { rows: 1.5 }, /rows must be a positive integer/],
     ['NaN chunkPx', { chunkPx: Number.NaN }, /chunkPx must be a positive integer/],
     ['Infinity outWidth', { outWidth: Number.POSITIVE_INFINITY }, /outWidth must be a positive integer/],
-    ['oversized cols', { cols: 16385 }, /cols must be at most 16384/],
-    ['oversized outHeight', { outHeight: 16385 }, /outHeight must be at most 16384/],
-    ['oversized chunkPx', { chunkPx: 16385 }, /chunkPx must be at most 16384/],
+    ['oversized cols', { cols: 32769 }, /cols must be at most 32768/],
+    ['oversized outHeight', { outHeight: 32769 }, /outHeight must be at most 32768/],
+    ['oversized chunkPx', { chunkPx: 32769 }, /chunkPx must be at most 32768/],
     ['groups not an array', { groups: 'water' }, /groups must be an array/],
     ['group member not an object', { groups: ['water'] }, /each group must be an object/],
     ['group id not a string', { groups: [{ id: 1, label: 'Water' }] }, /non-empty string id and label/],
@@ -59,13 +59,13 @@ describe('validateExportSpec', () => {
     expect(() => validateExportSpec(spec)).toThrow(pattern as RegExp)
   })
 
-  it('rejects cols*rows above 16384 even when each dimension is within range', () => {
-    const spec = { ...validSpec(), cols: 128, rows: 129 }
-    expect(() => validateExportSpec(spec)).toThrow(/cols\*rows must be at most 16384/)
+  it('rejects cols*rows above 32768 even when each dimension is within range', () => {
+    const spec = { ...validSpec(), cols: 256, rows: 129 }
+    expect(() => validateExportSpec(spec)).toThrow(/cols\*rows must be at most 32768/)
   })
 
-  it('accepts cols*rows exactly at 16384', () => {
-    const spec = { ...validSpec(), cols: 128, rows: 128 }
+  it('accepts 32K dimensions (32768x32768) and cols*rows up to 32768', () => {
+    const spec = { ...validSpec(), cols: 16, rows: 16, outWidth: 32768, outHeight: 32768 }
     expect(() => validateExportSpec(spec)).not.toThrow()
   })
 })
