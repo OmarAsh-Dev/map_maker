@@ -52,9 +52,11 @@ afterEach(() => {
   cleanup()
 })
 
-it('renders the map_maker title', () => {
+it('renders the Map Maker title and logo', () => {
   render(<App />)
-  expect(screen.getByText('map_maker')).toBeInTheDocument()
+  expect(screen.getByRole('heading', { level: 1, name: 'Map Maker' })).toBeInTheDocument()
+  expect(screen.getAllByTestId('app-logo').length).toBeGreaterThanOrEqual(1)
+  expect(screen.queryByText('map_maker')).not.toBeInTheDocument()
 })
 
 describe('crop mode toggle', () => {

@@ -1,0 +1,27 @@
+<svg viewBox="0 0 64 64" width="512" height="512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="mm-bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="mm-water" x1="12" y1="36" x2="52" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#38bdf8" />
+    </linearGradient>
+    <linearGradient id="mm-land" x1="12" y1="26" x2="52" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#34d399" />
+    </linearGradient>
+    <linearGradient id="mm-pin" x1="22" y1="8" x2="42" y2="36" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fb923c" />
+      <stop offset="100%" stop-color="#e11d48" />
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#mm-bg)" />
+  <rect x="2.75" y="2.75" width="58.5" height="58.5" rx="13.25" stroke="#38bdf8" stroke-opacity="0.35" stroke-width="1.5" />
+  <path d="M32 35L52 44.5L32 54L12 44.5L32 35Z" fill="url(#mm-water)" stroke="#bae6fd" stroke-opacity="0.4" stroke-width="1" stroke-linejoin="round" />
+  <path d="M32 25L52 34.5L32 44L12 34.5L32 25Z" fill="url(#mm-land)" stroke="#a7f3d0" stroke-opacity="0.5" stroke-width="1" stroke-linejoin="round" />
+  <path d="M21 34.5L32 39.5L43 34.5M26.5 31.5L37.5 37" stroke="#ffffff" stroke-opacity="0.75" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M32 9C25.9249 9 21 13.9249 21 20C21 27.75 32 36.5 32 36.5C32 36.5 43 27.75 43 20C43 13.9249 38.0751 9 32 9Z" fill="url(#mm-pin)" stroke="#ffffff" stroke-width="1.75" stroke-linejoin="round" />
+  <circle cx="32" cy="19.5" r="4" fill="#ffffff" />
+</svg>

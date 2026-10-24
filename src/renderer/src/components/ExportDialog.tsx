@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ChangeEvent } from 'react'
+import AppLogo from './AppLogo'
 import { MAX_EXPORT_PX, planChunks } from '../lib/chunkPlan'
 import { runExport } from '../lib/exportEngine'
 import {
@@ -163,7 +164,10 @@ export default function ExportDialog() {
       className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/50"
     >
       <div className="relative w-[26rem] max-w-full rounded-lg bg-white p-5 shadow-xl">
-        <h2 className="text-base font-semibold text-slate-900">Export map</h2>
+        <div className="flex items-center gap-2.5">
+          <AppLogo className="h-6 w-6 shrink-0" />
+          <h2 className="text-base font-semibold text-slate-900">Export map</h2>
+        </div>
 
         <fieldset className="mt-4" aria-label="Export mode">
           <legend className="text-xs font-medium uppercase tracking-wide text-gray-500">Mode</legend>

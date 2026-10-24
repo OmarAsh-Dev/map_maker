@@ -2,7 +2,7 @@
   "name": "map-maker",
   "version": "1.1.0",
   "description": "High-resolution map customizer and exporter for After Effects workflows",
-  "author": "map_maker",
+  "author": "Map Maker",
   "private": true,
   "main": "out/main/index.js",
   "scripts": {

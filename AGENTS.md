@@ -1,4 +1,4 @@
-# map_maker
+# Map Maker
 
 ## What this is
 

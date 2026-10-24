@@ -1,13 +1,15 @@
 appId: com.mapmaker.app
-productName: map-maker
+productName: Map Maker
 directories:
   output: release
 files:
   - out/**
+  - resources/**
   - package.json
 asarUnpack:
   - '**/node_modules/sharp/**'
   - '**/node_modules/canvas/**'
 win:
+  icon: build/icon.ico
   target:
     - zip

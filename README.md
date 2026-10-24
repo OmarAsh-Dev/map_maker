@@ -1,4 +1,8 @@
-# map_maker
+# Map Maker
+
+<p align="center">
+  <img src="build/icon.png" width="96" height="96" alt="Map Maker Logo" />
+</p>
 
 A Windows desktop map customizer and high-resolution exporter — a desktop take on [mapbuilder.app](https://mapbuilder.app/map), built on **OpenFreeMap** tiles (free, no API key) with **all map features editable** and exports up to **32k**, designed for After Effects workflows.
 
@@ -35,7 +39,7 @@ npm run dev        # dev app with HMR
 npm run build      # build to out/
 npm test           # vitest suite
 npm run typecheck  # tsc on web + node configs
-npm run dist       # build + package → release/map-maker-<version>-win.zip
+npm run dist       # build + package → release/Map Maker-<version>-win.zip
 ```
 
 ## Project layout
@@ -44,6 +48,8 @@ npm run dist       # build + package → release/map-maker-<version>-win.zip
 src/main/       Electron main process (window, IPC, export session, compositor, PSD, presets)
 src/preload/    contextBridge API (window.api)
 src/renderer/   React app (map, sidebar, export dialog, style engine, chunk renderer)
+build/          App icon assets (icon.svg, icon.png, icon.ico)
+resources/      Runtime window icon assets
 docs/superpowers/specs/  v1 design spec (approved)
 docs/superpowers/plans/  v1 & v1.1–v2.0 implementation plans
 ```

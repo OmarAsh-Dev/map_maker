@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react'
 import type { Map as MaplibreMap } from 'maplibre-gl'
+import AppLogo from './components/AppLogo'
 import MapCanvas from './components/MapCanvas'
 import CropOverlay from './components/CropOverlay'
 import ExportDialog from './components/ExportDialog'
@@ -39,6 +40,13 @@ function App() {
   return (
     <main className="flex h-screen w-screen overflow-hidden bg-slate-950">
       <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-r border-gray-200 bg-white">
+        <div className="flex items-center gap-2.5 border-b border-slate-800 bg-slate-900 px-3.5 py-2.5 text-white">
+          <AppLogo className="h-6 w-6 shrink-0" />
+          <span className="text-sm font-semibold tracking-tight">Map Maker</span>
+          <span className="ml-auto rounded bg-sky-500/20 px-1.5 py-0.5 font-mono text-[10px] font-medium text-sky-300">
+            v1.1
+          </span>
+        </div>
         <div className="border-b border-gray-200 p-3">
           <label
             htmlFor="basemap-select"
@@ -69,9 +77,10 @@ function App() {
       </aside>
       <div className="relative min-w-0 flex-1">
         <MapCanvas key={basemapUrl} styleUrl={basemapUrl} onMapReady={handleMapReady} />
-        <h1 className="pointer-events-none absolute left-4 top-4 z-10 text-4xl font-bold text-slate-50">
-          map_maker
-        </h1>
+        <div className="pointer-events-none absolute left-4 top-4 z-10 flex items-center gap-2.5 rounded-xl border border-slate-700/60 bg-slate-900/90 px-3.5 py-2 shadow-lg backdrop-blur-sm">
+          <AppLogo className="h-8 w-8 shrink-0" />
+          <h1 className="text-xl font-bold tracking-tight text-white">Map Maker</h1>
+        </div>
         <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
           <button
             type="button"

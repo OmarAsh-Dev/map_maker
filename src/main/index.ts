@@ -3,7 +3,8 @@ import { join } from 'path'
 import { registerExportIpc } from './ipc'
 import { PresetStore } from './presets'
 
-app.userAgentFallback = 'map_maker/0.1 (' + app.userAgentFallback + ')'
+app.setName('Map Maker')
+app.userAgentFallback = 'MapMaker/1.1 (' + app.userAgentFallback + ')'
 
 function registerIpcHandlers(): void {
   const presets = new PresetStore(join(app.getPath('userData'), 'presets'))
@@ -23,6 +24,8 @@ function createWindow(): void {
     width: 1280,
     height: 800,
     show: false,
+    title: 'Map Maker',
+    icon: join(__dirname, '../../resources/icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
