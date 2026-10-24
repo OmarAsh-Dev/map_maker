@@ -69,6 +69,7 @@ export class ChunkRenderer {
   private container: HTMLDivElement | null = null
   private map: MaplibreMap | null = null
   private creating: Promise<void> | null = null
+  private lastPassKey: string | null = null
 
   constructor(opts: ChunkRendererOptions) {
     this.chunkPx = Math.max(1, Math.round(opts.chunkPx))
@@ -147,13 +148,20 @@ export class ChunkRenderer {
     signal?: AbortSignal
   ): Promise<ChunkImage> {
     await this.ensureStyle(style, signal)
+    if (signal?.aborted) {
+      throw new Error('Export cancelled')
+    }
     const map = this.map
     if (!map) {
       throw new Error('ChunkRenderer: renderer was destroyed before renderChunk completed')
     }
 
-    const masked = applyPassMask(style, layerMap, pass)
-    map.setStyle(masked, { diff: false })
+    const passKey = pass.type === 'flat' ? 'flat' : `${pass.type}:${pass.groupId}`
+    if (this.lastPassKey !== passKey) {
+      const masked = applyPassMask(style, layerMap, pass)
+      map.setStyle(masked, { diff: false })
+      this.lastPassKey = passKey
+    }
     // Keep the preview zoom so every zoom-dependent style property, visibility
     // threshold and source detail stays the same. Pixel density supplies the
     // extra resolution; scaling widths as well would thicken roads twice.
@@ -163,6 +171,9 @@ export class ChunkRenderer {
     const center = worldPxToLngLat(centerPx.x + excess / 2, centerPx.y + excess / 2, plan.zoom)
     map.jumpTo({ center: [center.lng, center.lat], zoom, bearing: 0, pitch: 0 })
     await waitForMapEvent(map, 'idle', signal)
+    if (signal?.aborted) {
+      throw new Error('Export cancelled')
+    }
 
     const source = map.getCanvas()
     const expectedPx = Math.round(this.cssPx * this.pixelRatio)
@@ -176,19 +187,31 @@ export class ChunkRenderer {
     if (!context) throw new Error('ChunkRenderer: 2D canvas unavailable')
     context.drawImage(source, 0, 0, this.chunkPx, this.chunkPx, 0, 0, this.chunkPx, this.chunkPx)
     const png = dataUrlToArrayBuffer(canvas.toDataURL('image/png'))
+    if (signal?.aborted) {
+      throw new Error('Export cancelled')
+    }
     return { col: chunk.col, row: chunk.row, png }
   }
 
   destroy(): void {
+    this.lastPassKey = null
     const map = this.map
     this.map = null
     if (map) {
-      map.remove()
+      try {
+        map.remove()
+      } catch {
+        // Ignore cleanup errors if MapLibre was mid-load when aborted
+      }
     }
     const container = this.container
     this.container = null
     if (container) {
-      container.remove()
+      try {
+        container.remove()
+      } catch {
+        // Ignore DOM removal errors
+      }
     }
   }
 }

@@ -231,7 +231,12 @@ describe('ExportDialog', () => {
     })
   })
 
-  it('cancel aborts the run and notifies the main process', async () => {
+  it('cancel immediately stops the export, updates UI to cancelled, and ignores late progress', async () => {
+    let progressCb: ((p: ExportMainProgress) => void) | null = null
+    api.onExportProgress.mockImplementation((cb: (p: ExportMainProgress) => void) => {
+      progressCb = cb
+      return () => {}
+    })
     useExportStore.setState({ cropBounds: BOUNDS })
     renderChunkMock.mockImplementation(() => new Promise(() => {}))
     const user = userEvent.setup()
@@ -242,6 +247,19 @@ describe('ExportDialog', () => {
 
     expect(api.cancelExport).toHaveBeenCalledTimes(1)
     expect(useExportStore.getState().abortController?.signal.aborted).toBe(true)
+    expect(useExportStore.getState().exporting).toBe(false)
+    expect(useExportStore.getState().status).toBe('cancelled')
+    expect(screen.getByText('Export cancelled')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Close' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Export' })).toBeEnabled()
+
+    // Late IPC progress after cancel must not flip status back to compositing/done
+    act(() => {
+      progressCb?.({ stage: 'compositing', group: 'Flat', done: 1, total: 1 })
+      useExportStore.getState().setRenderProgress(2, 4)
+    })
+    expect(useExportStore.getState().status).toBe('cancelled')
+    expect(useExportStore.getState().exporting).toBe(false)
   })
 
   it('keeps the main-process error message instead of double-reporting the finish rejection', async () => {

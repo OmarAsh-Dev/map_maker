@@ -111,6 +111,7 @@ export default function ExportDialog() {
     if (typeof window.api !== 'undefined') {
       window.api.cancelExport()
     }
+    state.endExport('cancelled', 'Export cancelled')
   }
 
   const handleExport = async () => {
@@ -146,10 +147,12 @@ export default function ExportDialog() {
         signal: controller.signal,
       })
       const after = useExportStore.getState()
-      after.endExport('done')
+      if (!controller.signal.aborted && after.status !== 'cancelled') {
+        after.endExport('done')
+      }
     } catch (err) {
       const after = useExportStore.getState()
-      if (controller.signal.aborted) {
+      if (controller.signal.aborted || after.status === 'cancelled') {
         after.endExport('cancelled', 'Export cancelled')
       } else if (after.status !== 'error') {
         after.endExport('error', err instanceof Error ? err.message : String(err))

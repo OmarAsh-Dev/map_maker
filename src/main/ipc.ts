@@ -54,6 +54,7 @@ export function registerExportIpc(): void {
 
   ipcMain.on('export:cancel', () => {
     activeSession?.cancel()
+    activeSession = null
   })
 
   ipcMain.handle('export:select-path', async (event, defaultName: string, kind?: ExportPathKind) => {

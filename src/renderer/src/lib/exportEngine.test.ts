@@ -207,10 +207,23 @@ describe('runExport', () => {
     ).rejects.toThrow(/cancel/i)
 
     expect(calls).toHaveLength(2)
-    expect(fakeApi.sendChunk).toHaveBeenCalledTimes(2)
+    expect(fakeApi.sendChunk).toHaveBeenCalledTimes(1)
     expect(fakeApi.finishExport).not.toHaveBeenCalled()
     expect(fakeApi.cancelExport).not.toHaveBeenCalled()
     expect(renderer.destroy).toHaveBeenCalledTimes(1)
+  })
+
+  it('aborts immediately when signal fires while renderChunk or finishExport is hung', async () => {
+    const { renderer, renderChunk } = createFakeRenderer()
+    const controller = new AbortController()
+    ;(renderChunk as Mock).mockImplementation(() => new Promise(() => {}))
+
+    const promise = runExport(baseOpts({ renderer, signal: controller.signal }))
+    setTimeout(() => controller.abort(), 10)
+
+    await expect(promise).rejects.toThrow(/cancel/i)
+    expect(renderer.destroy).toHaveBeenCalled()
+    expect(fakeApi.finishExport).not.toHaveBeenCalled()
   })
 
   it('rejects without beginning or rendering when the signal is already aborted', async () => {

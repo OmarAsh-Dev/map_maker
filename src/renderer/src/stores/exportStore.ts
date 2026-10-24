@@ -159,8 +159,16 @@ export const useExportStore = create<ExportState>()((set, get) => ({
     })
     return controller
   },
-  setRenderProgress: (done, total) => set({ renderDone: done, renderTotal: total }),
+  setRenderProgress: (done, total) => {
+    if (!get().exporting || get().status === 'cancelled' || get().abortController?.signal.aborted) {
+      return
+    }
+    set({ renderDone: done, renderTotal: total })
+  },
   handleMainProgress: (progress) => {
+    if (get().status === 'cancelled' || get().abortController?.signal.aborted) {
+      return
+    }
     if (progress.stage === 'compositing') {
       set({ status: 'compositing', compositeDone: progress.done, compositeTotal: progress.total })
       return
